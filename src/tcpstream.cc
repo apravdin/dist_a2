@@ -1,4 +1,4 @@
-#include "TCPStream.h"
+#include "tcpstream.h"
 #include <iostream>
 #include <string>
 #include <sys/socket.h>
