@@ -8,11 +8,18 @@
 int main() {
     std::cout << "starting" << std::endl;
     TCPConnector *c = new TCPConnector();
+    std::cout << "end" << std::endl;
     TCPStream *stream;
     char *server_name = getenv("SERVER_ADDRESS");
-    int port = atoi(getenv("SERVER_PORT"));
+    char *port = getenv("SERVER_PORT");
+
+    if (server_name == NULL || port == NULL) {
+        std::cerr << "Failed to find SERVER_ADDRESS or SERVER_PORT" << std::endl;
+        return 0;
+    }
+
     std::cout << "Connection to: " << server_name << ":" << port << std::endl;
-    stream = c->connect(port, server_name);
+    stream = c->connect(atoi(port), server_name);
 
     if (stream == NULL) {
         std::cerr << "Failed to connect" << std::endl;
