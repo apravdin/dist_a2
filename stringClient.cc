@@ -6,6 +6,7 @@
 #define BUFFER_SIZE 256
 
 int main() {
+    std::cout << "starting" << std::endl;
     TCPConnector *c = new TCPConnector();
     TCPStream *stream;
     char *server_name = getenv("SERVER_ADDRESS");

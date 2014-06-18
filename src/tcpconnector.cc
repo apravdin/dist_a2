@@ -36,16 +36,16 @@ TCPStream *TCPConnector::connect(int port, const char *server) {
     int ret = resolveHostName(server, &(address.sin_addr));
 
     if (ret != 0) {
-        std::cerr << "Failed to resolve hostname, trying ip approach" << std::endl;
-        inet_pton(PF_INET, server, &(address.sin_addr));
+        std::cerr << "Failed to resolve hostname" << std::endl;
+        return NULL;
     }
 
 #ifdef DEBUG
     inet_pton(PF_INET, "127.0.0.1", &(address.sin_addr));
-    char saddr[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(address.sin_addr), saddr, INET_ADDRSTRLEN);
-    std::cout << "Got server info: " << saddr << std::endl;
 #endif
+    // char saddr[INET_ADDRSTRLEN];
+    // inet_ntop(AF_INET, &(address.sin_addr), saddr, INET_ADDRSTRLEN);
+    // std::cout << "Got server info: " << saddr << std::endl;
 
     // Create a socket
     int sd = socket(DOMAIN, TYPE, PROTOCOL);
