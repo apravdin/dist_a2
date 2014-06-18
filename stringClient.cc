@@ -2,6 +2,7 @@
 #include <string>
 #include "tcpconnector.h"
 #include <stdlib.h>
+#include <unistd.h>
 
 #define BUFFER_SIZE 256
 
@@ -18,7 +19,7 @@ int main() {
         return 0;
     }
 
-    std::cout << "Connection to: " << server_name << ":" << port << std::endl;
+    std::cout << "Connecting to: " << server_name << ":" << port << std::endl;
     stream = c->connect(atoi(port), server_name);
 
     if (stream == NULL) {
@@ -32,9 +33,10 @@ int main() {
     int bytes_read;
     char buf[BUFFER_SIZE];
 
+
     while(1) {
+        sleep(2);
         std::getline(std::cin, msg);
-        std::cout << "sending - " << msg << std::endl;
 
         msg_len = msg.size() + 1;
 
