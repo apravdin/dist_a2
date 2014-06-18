@@ -15,6 +15,7 @@ public:
 
     int get_sd();
 
+    int send(const int *val);
     int send(const char *buffer, int len);
     int receive(char *buffer, int len);
 };

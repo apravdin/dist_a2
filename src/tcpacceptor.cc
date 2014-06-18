@@ -32,7 +32,7 @@ int TCPAcceptor::start() {
     bzero(&address, sizeof(address));
     address.sin_family = PF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.sin_port = htons(INADDR_ANY);
+    address.sin_port = htons(12345);
 
     int result = bind(this->m_lsd, (struct sockaddr*)&address, sizeof(address));
 

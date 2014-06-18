@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <cstring>
 #include <unistd.h>
 #include "tcpacceptor.h"
 
@@ -7,10 +8,10 @@
 
 int process_data(int sd);
 int is_divider(char c);
-void totitle(char *buffer, int len);
+void totitle(std::string &msg);
 
 int main() {
-    TCPAcceptor *acceptor = new TCPAcceptor(12377);
+    TCPAcceptor *acceptor = new TCPAcceptor(12345);
     vector<int> active_socks;
 
     int main_socket;
@@ -32,14 +33,12 @@ int main() {
         maxfd = main_socket;
         FD_SET(main_socket, &total_set);
 
-        std::cout << "Awaiting connections" << std::endl;
         while(1) {
             active_set = total_set;
             result = select(maxfd+1, &active_set, NULL, NULL, NULL);
 
             if (result > 0) {
                 if (FD_ISSET(main_socket, &active_set)) {
-                    std::cout << "Getting connection" << std::endl;
 
                     // Accept connection
                     cursd = acceptor->accept();
@@ -57,8 +56,6 @@ int main() {
                 // Iterate through all active sockets
                 for (std::vector<int>::iterator it = active_socks.begin() ; it != active_socks.end();) {
                     if (FD_ISSET(*it, &active_set)) {
-                        std::cout << "Processing data: " << *it << std::endl;
-
                         if (process_data(*it) != 0) {
                             close(*it);
                             active_socks.erase(it);
@@ -76,37 +73,47 @@ int main() {
 }
 
 int process_data(int sd) {
-    string msg;
-    char buffer[BUFFER_SIZE];
+    int msg_len;
+    int bytes_read = 0;
+    int len;
+
+    string msg = "";
+    char buffer[BUFFER_SIZE] = { 0 };
 
     // Get user input
-    int len = read(sd, buffer, sizeof(buffer));
-    if (len <= 0) {
-        std::cerr << "No input" << endl;
-        return -1;
+    read(sd, &msg_len, sizeof(msg_len));
+    while (bytes_read < msg_len) {
+        len = read(sd, buffer, BUFFER_SIZE-1);
+        if (len <= 0) {
+            return -1;
+        }
+
+        buffer[len] = 0;
+        bytes_read += len;
+        std::cout << buffer << std::endl;
+        msg.append(buffer, len);
     }
-    buffer[len] = 0;
-    std::cout << "received: " << (int)*buffer << endl;
-    msg.append(buffer, len);
 
-    totitle(buffer, len);
+    totitle(msg);
 
+    std::cout << msg << std::endl;
     // Send back to client
-    write(sd, buffer, len);
+    write(sd, msg.c_str(), msg.length());
 
     return 0;
 }
 
 // Set to title case
-void totitle(char *buffer, int len) {
+void totitle(std::string &msg) {
     int status = 1;
+    int len = msg.length();
     for (int i = 0; i < len; i++) {
-        if (status && !is_divider(buffer[i])) {
-            buffer[i] = toupper(buffer[i]);
+        if (status && !is_divider(msg[i])) {
+            msg[i] = toupper(msg[i]);
             status = 0;
         } else {
-            buffer[i] = tolower(buffer[i]);
-            status = is_divider(buffer[i]);
+            msg[i] = tolower(msg[i]);
+            status = is_divider(msg[i]);
         }
     }
 }

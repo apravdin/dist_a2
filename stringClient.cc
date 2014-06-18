@@ -7,12 +7,10 @@
 #define BUFFER_SIZE 256
 
 int main() {
-    std::cout << "starting" << std::endl;
     TCPConnector *c = new TCPConnector();
-    std::cout << "end" << std::endl;
     TCPStream *stream;
-    char *server_name = getenv("SERVER_ADDRESS");
-    char *port = getenv("SERVER_PORT");
+    char *server_name = "TheBeast-PC";//getenv("SERVER_ADDRESS");
+    char *port = "12345";//getenv("SERVER_PORT");
 
     if (server_name == NULL || port == NULL) {
         std::cerr << "Failed to find SERVER_ADDRESS or SERVER_PORT" << std::endl;
@@ -27,7 +25,7 @@ int main() {
         return 0;
     }
 
-    std::string msg;
+    std::string msg = "####";
     int msg_len;
     int total_bytes_read;
     int bytes_read;
@@ -38,8 +36,9 @@ int main() {
         sleep(2);
         std::getline(std::cin, msg);
 
-        msg_len = msg.size() + 1;
+        msg_len = msg.size();
 
+        stream->send(&msg_len);
         stream->send(msg.c_str(), msg_len);
         total_bytes_read = 0;
         msg = "";
