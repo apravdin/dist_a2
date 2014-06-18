@@ -8,7 +8,6 @@
 class TCPStream {
     int m_sd;
     int m_port;
-    std::string m_ip;
 
 public:
     TCPStream(int sd, struct sockaddr_in *addr);

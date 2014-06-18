@@ -10,9 +10,6 @@
 
 
 TCPStream::TCPStream(int sd, struct sockaddr_in *addr): m_sd(sd) {
-    char ip[INET_ADDRSTRLEN];
-    inet_ntop(PF_INET, (struct in_addr*)&(addr->sin_addr.s_addr), ip, sizeof(ip)-1);
-    m_ip = ip;
     m_port = ntohs(addr->sin_port);
 };
 
