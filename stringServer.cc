@@ -73,6 +73,7 @@ int main() {
 }
 
 int process_data(int sd) {
+    std::cout << "Processing data: " << sd << std::endl;
     int msg_len;
     int bytes_read = 0;
     int len;
@@ -84,6 +85,7 @@ int process_data(int sd) {
     // Get user input
     read(sd, &msg_len, sizeof(msg_len));
     write(sd, &msg_len, sizeof(msg_len));
+    std::cout << "LEN: " << msg_len << std::endl;
     while (bytes_read < msg_len) {
         len = read(sd, buffer, BUFFER_SIZE-1);
         if (len <= 0) {
@@ -93,6 +95,7 @@ int process_data(int sd) {
         buffer[len] = 0;
         bytes_read += len;
         // msg.append(buffer, len);
+        std::cout << "buffer: " << buffer << " " << bytes_read << "/" << msg_len <<  std::endl;
 
         std::cout << buffer;
         status = totitle(buffer, len, status);
