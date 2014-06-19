@@ -7,7 +7,7 @@ OBJ=$(wildcard src/*.o)
 BIN=$(patsubst %.cc,%, $(SRC))
 
 
-CFLAGS = -D DEBUG -c -Wall -I include
+CFLAGS = -c -Wall -I include
 LDFLAGS =
 
 .SUFFIXES:

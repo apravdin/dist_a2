@@ -39,7 +39,9 @@ int main() {
 
             if (result > 0) {
                 if (FD_ISSET(main_socket, &active_set)) {
+#ifdef DEBUG
                     std::cout << "Accepting" << std::endl;
+#endif
                     // Accept connection
                     cursd = acceptor->accept();
                     if (cursd > 0) {
@@ -73,7 +75,9 @@ int main() {
 }
 
 int process_data(int sd) {
+#ifdef DEBUG
     std::cout << "Processing data: " << sd << std::endl;
+#endif
     int msg_len;
     int bytes_read = 0;
     int len;
@@ -88,7 +92,6 @@ int process_data(int sd) {
     }
 
     write(sd, &msg_len, sizeof(msg_len));
-    std::cout << "LEN: " << msg_len << std::endl;
     while (bytes_read < msg_len) {
         len = read(sd, buffer, BUFFER_SIZE-1);
         if (len <= 0) {
@@ -97,8 +100,9 @@ int process_data(int sd) {
 
         buffer[len] = 0;
         bytes_read += len;
-        std::cout << "buffer: " << buffer << " " << bytes_read << "/" << msg_len <<  std::endl;
-
+#ifdef DEBUG
+        std::cout << "read: " << bytes_read << "/" << msg_len <<  std::endl;
+#endif
         std::cout << buffer;
         status = totitle(buffer, len, status);
 
