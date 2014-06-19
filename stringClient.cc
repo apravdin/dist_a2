@@ -31,9 +31,8 @@ int main() {
     char buf[BUFFER_SIZE];
 
 
-    while(1) {
+    while(std::getline(std::cin, msg)) {
         sleep(2);
-        std::getline(std::cin, msg);
 
         msg_len = msg.size();
 
