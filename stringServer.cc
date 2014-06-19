@@ -8,7 +8,7 @@
 
 int process_data(int sd);
 int is_divider(char c);
-void totitle(std::string &msg);
+int totitle(char *buffer, int len, int status);
 
 int main() {
     TCPAcceptor *acceptor = new TCPAcceptor(12345);
@@ -76,12 +76,14 @@ int process_data(int sd) {
     int msg_len;
     int bytes_read = 0;
     int len;
+    int status = 1;
 
     string msg = "";
     char buffer[BUFFER_SIZE] = { 0 };
 
     // Get user input
     read(sd, &msg_len, sizeof(msg_len));
+    write(sd, &msg_len, sizeof(msg_len));
     while (bytes_read < msg_len) {
         len = read(sd, buffer, BUFFER_SIZE-1);
         if (len <= 0) {
@@ -90,33 +92,34 @@ int process_data(int sd) {
 
         buffer[len] = 0;
         bytes_read += len;
-        msg.append(buffer, len);
+        // msg.append(buffer, len);
+
+        std::cout << buffer;
+        status = totitle(buffer, len, status);
+
+        write(sd, buffer, len);
     }
-
-    std::cout << msg << std::endl;
-
-    totitle(msg);
+    std::cout << std::endl;
 
     // Send back to client
-    write(sd, &msg_len, sizeof(msg_len));
-    write(sd, msg.c_str(), msg.length());
+    // write(sd, &msg_len, sizeof(msg_len));
+    // write(sd, msg.c_str(), msg.length());
 
     return 0;
 }
 
 // Set to title case
-void totitle(std::string &msg) {
-    int status = 1;
-    int len = msg.length();
+int totitle(char *buffer, int len, int status = 1) {
     for (int i = 0; i < len; i++) {
-        if (status && !is_divider(msg[i])) {
-            msg[i] = toupper(msg[i]);
+        if (status && !is_divider(buffer[i])) {
+            buffer[i] = toupper(buffer[i]);
             status = 0;
         } else {
-            msg[i] = tolower(msg[i]);
-            status = is_divider(msg[i]);
+            buffer[i] = tolower(buffer[i]);
+            status = is_divider(buffer[i]);
         }
     }
+    return status;
 }
 
 int is_divider(char c) {
