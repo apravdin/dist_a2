@@ -82,7 +82,11 @@ int process_data(int sd) {
     char buffer[BUFFER_SIZE] = { 0 };
 
     // Get user input
-    read(sd, &msg_len, sizeof(msg_len));
+    len = read(sd, &msg_len, sizeof(msg_len));
+    if (len <= 0) {
+        return -1;
+    }
+
     write(sd, &msg_len, sizeof(msg_len));
     while (bytes_read < msg_len) {
         len = read(sd, buffer, BUFFER_SIZE-1);
