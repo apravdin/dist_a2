@@ -32,7 +32,6 @@ int main() {
 
 
     while(std::getline(std::cin, msg)) {
-        sleep(2);
 
         msg_len = msg.size();
 
@@ -61,6 +60,7 @@ int main() {
         }
 
         std::cout << "Server: " << msg << std::endl;
+        sleep(2);
     }
 
     delete c;
