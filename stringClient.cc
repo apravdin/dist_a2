@@ -9,15 +9,14 @@
 int main() {
     TCPConnector *c = new TCPConnector();
     TCPStream *stream;
-    char *server_name = "TheBeast-PC";//getenv("SERVER_ADDRESS");
-    char *port = "12345";//getenv("SERVER_PORT");
+    char *server_name = getenv("SERVER_ADDRESS");
+    char *port = getenv("SERVER_PORT");
 
     if (server_name == NULL || port == NULL) {
         std::cerr << "Failed to find SERVER_ADDRESS or SERVER_PORT" << std::endl;
         return 0;
     }
 
-    std::cout << "Connecting to: " << server_name << ":" << port << std::endl;
     stream = c->connect(atoi(port), server_name);
 
     if (stream == NULL) {

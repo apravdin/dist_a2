@@ -90,13 +90,11 @@ int process_data(int sd) {
 
         buffer[len] = 0;
         bytes_read += len;
-        std::cout << buffer << std::endl;
         msg.append(buffer, len);
     }
 
     totitle(msg);
 
-    std::cout << msg << std::endl;
     // Send back to client
     write(sd, msg.c_str(), msg.length());
 

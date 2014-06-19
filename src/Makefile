@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = -D DEBUG -c -Wall -I ../include
+CFLAGS = -c -Wall -I ../include
 
 SRC=$(wildcard *.cc)
 

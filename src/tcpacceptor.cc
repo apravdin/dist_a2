@@ -20,7 +20,6 @@ TCPAcceptor::~TCPAcceptor() {
 
 int TCPAcceptor::start() {
     this->m_lsd = socket(PF_INET, SOCK_STREAM, 0);
-    std::cout << "Server socket: " << this->m_lsd << std::endl;
 
     if (this->m_lsd <= 0) {
         std::cerr << "Failed to create server socket" << std::endl;
@@ -32,7 +31,7 @@ int TCPAcceptor::start() {
     bzero(&address, sizeof(address));
     address.sin_family = PF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.sin_port = htons(12345);
+    address.sin_port = htons(INADDR_ANY);
 
     int result = bind(this->m_lsd, (struct sockaddr*)&address, sizeof(address));
 
