@@ -83,7 +83,11 @@ int process_data(int sd) {
     char buffer[BUFFER_SIZE] = { 0 };
 
     // Get user input
-    read(sd, &msg_len, sizeof(msg_len));
+    len = read(sd, &msg_len, sizeof(msg_len));
+    if (len <= 0) {
+        return -1;
+    }
+
     write(sd, &msg_len, sizeof(msg_len));
     std::cout << "LEN: " << msg_len << std::endl;
     while (bytes_read < msg_len) {
