@@ -79,7 +79,6 @@ int process_data(int sd) {
     int len;
     int status = 1;
 
-    string msg = "";
     char buffer[BUFFER_SIZE] = { 0 };
 
     // Get user input
@@ -98,7 +97,6 @@ int process_data(int sd) {
 
         buffer[len] = 0;
         bytes_read += len;
-        // msg.append(buffer, len);
         std::cout << "buffer: " << buffer << " " << bytes_read << "/" << msg_len <<  std::endl;
 
         std::cout << buffer;
@@ -107,10 +105,6 @@ int process_data(int sd) {
         write(sd, buffer, len);
     }
     std::cout << std::endl;
-
-    // Send back to client
-    // write(sd, &msg_len, sizeof(msg_len));
-    // write(sd, msg.c_str(), msg.length());
 
     return 0;
 }
