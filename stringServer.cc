@@ -39,7 +39,7 @@ int main() {
 
             if (result > 0) {
                 if (FD_ISSET(main_socket, &active_set)) {
-
+                    std::cout << "Accepting" << std::endl;
                     // Accept connection
                     cursd = acceptor->accept();
                     if (cursd > 0) {
@@ -92,6 +92,8 @@ int process_data(int sd) {
         bytes_read += len;
         msg.append(buffer, len);
     }
+
+    std::cout << msg << std::endl;
 
     totitle(msg);
 
