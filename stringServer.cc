@@ -98,6 +98,7 @@ int process_data(int sd) {
     totitle(msg);
 
     // Send back to client
+    write(sd, &msg_len, sizeof(msg_len));
     write(sd, msg.c_str(), msg.length());
 
     return 0;

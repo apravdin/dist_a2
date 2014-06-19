@@ -25,9 +25,8 @@ int main() {
         return 0;
     }
 
-    std::string msg = "####";
+    std::string msg = "";
     int msg_len;
-    int total_bytes_read;
     int bytes_read;
     char buf[BUFFER_SIZE];
 
@@ -40,18 +39,28 @@ int main() {
 
         stream->send(&msg_len);
         stream->send(msg.c_str(), msg_len);
-        total_bytes_read = 0;
-        msg = "";
         std::cout << "Sending: " << msg << std::endl;
 
-        while(total_bytes_read < msg_len) {
-            bytes_read = stream->receive(buf, BUFFER_SIZE);
 
-            if (bytes_read > 0) {
-                msg.append(buf, bytes_read);
-                total_bytes_read += bytes_read;
+        int msg_len;
+        bytes_read = 0;
+        int len;
+
+        msg = "";
+
+        // Get server response
+        read(stream->get_sd(), &msg_len, sizeof(msg_len));
+        while (bytes_read < msg_len) {
+            len = stream->receive(buf, BUFFER_SIZE-1);
+            if (len <= 0) {
+                return -1;
             }
+
+            buf[len] = 0;
+            bytes_read += len;
+            msg.append(buf, len);
         }
+
         std::cout << "Server: " << msg << std::endl;
     }
 
