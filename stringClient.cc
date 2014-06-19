@@ -35,6 +35,10 @@ int main() {
 
         msg_len = msg.size();
 
+        if (msg_len <= 0) {
+            continue;
+        }
+
         stream->send(&msg_len);
         stream->send(msg.c_str(), msg_len);
         std::cout << "Sending: " << msg << std::endl;
