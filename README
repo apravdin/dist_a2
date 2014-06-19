@@ -33,6 +33,10 @@ Cleaning
 Running
 =========================
 
-> ./stringServer - This will start a tcp server on a random port and will display the servers hostname and port number.
+> ./stringServer
 
-> ./stringClient - This will read the `SERVER_ADDRESS` and `SERVER_PORT` environment variables and attempt to connect to the server
+This will start a tcp server on a random port and will display the servers hostname and port number.
+
+> ./stringClient
+
+This will read the `SERVER_ADDRESS` and `SERVER_PORT` environment variables and attempt to connect to the server
