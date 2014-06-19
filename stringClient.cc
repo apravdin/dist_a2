@@ -11,7 +11,9 @@ int main() {
     TCPStream *stream;
     char *server_name = getenv("SERVER_ADDRESS");
     char *port = getenv("SERVER_PORT");
+#ifdef DEBUG
     std::cout << "Connection to: " << server_name << ":" << port << std::endl;
+#endif
 
     if (server_name == NULL || port == NULL) {
         std::cerr << "Failed to find SERVER_ADDRESS or SERVER_PORT" << std::endl;
@@ -41,8 +43,9 @@ int main() {
 
         stream->send(&msg_len);
         stream->send(msg.c_str(), msg_len);
+#ifdef DEBUG
         std::cout << "Sending: " << msg << std::endl;
-
+#endif
 
         int msg_len;
         bytes_read = 0;
