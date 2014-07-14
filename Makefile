@@ -4,8 +4,7 @@ SRC = $(wildcard *.cc)
 
 OBJ=$(wildcard src/*.o)
 
-BIN=$(patsubst %.cc,%, $(SRC))
-
+BIN=$(patsubst %.cc,%.out, $(SRC))
 
 CFLAGS = -c -Wall -I include
 LDFLAGS =
@@ -18,9 +17,9 @@ make_src:
 	make -C src
 
 %.o: %.cc
-	$(CXX) $(CFLAGS) -o $@ $<
+	$(CXX) $(CFLAGS) $< -o $@
 
-%: %.o
+%.out: %.o
 	$(CXX) -o $@ $(LDFLAGS) $< $(OBJ)
 
 clean:

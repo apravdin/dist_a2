@@ -6,7 +6,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
- 
+
 #define ARG_CHAR    1
 #define ARG_SHORT   2
 #define ARG_INT     3

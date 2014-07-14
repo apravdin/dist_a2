@@ -8,7 +8,7 @@
 int f0(int a, int b) {
 
   return a + b;
-}   
+}
 
 
 /* returns: OUT; a, b, c, d: IN */
@@ -18,7 +18,7 @@ long f1(char a, short b, int c, long d) {
 }
 
 
-/* return string is the concatenation of the integer 
+/* return string is the concatenation of the integer
    part of the float and the interger part of the double
    return: OUT string; a, b: IN */
 
@@ -27,7 +27,6 @@ char* f2(float a, double b) {
   float ai;
   double bi;
   char *str1;
-  char *str2;
 
   a = modff(a, &ai);
   b = modf(b, &bi);
@@ -40,10 +39,10 @@ char* f2(float a, double b) {
 }
 
 
-/* 
+/*
  * bubble sort
  * the first element in the array indicates the size of the array
- * a: INOUT array 
+ * a: INOUT array
  */
 
 void f3(long a[]) {
@@ -63,7 +62,7 @@ void f3(long a[]) {
 }
 
 /*
- * print file named by a 
+ * print file named by a
  * a: IN array
  */
 

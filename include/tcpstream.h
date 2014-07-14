@@ -5,6 +5,8 @@
 #ifndef TCPSTREAM_H__
 #define TCPSTREAM_H__
 
+#define BUFFER_SIZE 256
+
 class TCPStream {
     int m_sd;
     int m_port;
@@ -17,6 +19,7 @@ public:
 
     int send(const int *val);
     int send(const char *buffer, int len);
+    int send(const int *buffer, int len);
     int receive(char *buffer, int len);
 };
 

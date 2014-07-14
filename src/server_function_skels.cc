@@ -10,7 +10,7 @@ int f0_Skel(int *argTypes, void **args) {
 
 int f1_Skel(int *argTypes, void **args) {
 
-  *((long *)*args) = f1( *((char *)(*(args + 1))), 
+  *((long *)*args) = f1( *((char *)(*(args + 1))),
 		        *((short *)(*(args + 2))),
 		        *((int *)(*(args + 3))),
 		        *((long *)(*(args + 4))) );
@@ -32,9 +32,9 @@ int f3_Skel(int *argTypes, void **args) {
   return 0;
 }
 
-/* 
+/*
  * this skeleton doesn't do anything except returns
- * a negative value to mimic an error during the 
+ * a negative value to mimic an error during the
  * server function execution, i.e. file not exist
  */
 int f4_Skel(int *argTypes, void **args) {

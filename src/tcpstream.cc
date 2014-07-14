@@ -7,8 +7,6 @@
 #include <unistd.h>
 #include <cstring>
 
-
-
 TCPStream::TCPStream(int sd, struct sockaddr_in *addr): m_sd(sd) {
     m_port = ntohs(addr->sin_port);
 };
@@ -21,8 +19,12 @@ int TCPStream::send(const char *buffer, int len) {
     return ::write(this->m_sd, buffer, len);
 }
 
-int TCPStream::send(const int* val) {
+int TCPStream::send(const int *val) {
     return ::write(this->m_sd, val, sizeof(int));
+}
+
+int TCPStream::send(const int *buffer, int len) {
+    return ::write(this->m_sd, buffer, sizeof(int) * len);
 }
 
 int TCPStream::receive(char *buffer, int len) {

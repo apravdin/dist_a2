@@ -1,14 +1,15 @@
-CXX = g++
+COMPILER = g++
 CFLAGS = -c -Wall -I ../include
 
 SRC=$(wildcard *.cc)
-
 OBJ=$(patsubst %.cc,%.o, $(SRC))
+
+.SUFFIXES:
 
 all: $(OBJ)
 
 %.o: %.cc
-	$(CXX) $(CFLAGS) $< -o $@
+	$(COMPILER) $(CFLAGS) -Wall $< -o $@
 
 clean:
-	-rm -f $(OBJ)
+	-rm -f *.o
