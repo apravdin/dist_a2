@@ -1,7 +1,7 @@
 #ifndef RPC_ERRNO_H
 #define RPC_ERRNO_H
 
-#define RETVAL_SUCCESS 1
+#define RETVAL_SUCCESS 0
 
 // General errors
 #define ERRNO_ENV_VAR_NOT_SET   -1

@@ -7,6 +7,11 @@
 #include <rpc_errno.h>
 #include <rpc.h>
 
+static TCPStream *server_connection = NULL;
+void rpcReset() {
+    close(server_connection->get_sd());
+}
+
 int get_arg_num(int *argTypes) {
     int i = 0;
     while(argTypes[i] != 0) {
@@ -80,22 +85,22 @@ int send_data(TCPStream *stream, int type, bool sig_only, char *name, int *argTy
 
     int msg_len = NAME_SIZE + arg_len;
 
+    std::cout << "msg_len:" << msg_len << std::endl;
     if (stream->send(&msg_len) != sizeof(msg_len)) {
         return ERRNO_FAILED_SEND;
     }
-    // std::cout << "RET:" << 4 << std::endl;
+    std::cout << "type:" << type << std::endl;
     if (stream->send(&type) != sizeof(type)) {
         return ERRNO_FAILED_SEND;
     }
-    // std::cout << "RET:" << 4 << std::endl;
+    std::cout << "name:" << NAME_SIZE << std::endl;
     if (stream->send(sys_name, NAME_SIZE) != NAME_SIZE) {
         return ERRNO_FAILED_SEND;
     }
-    // std::cout << "RET:" << NAME_SIZE << std::endl;
-    if (stream->send(argTypes, arg_len) != arg_len * sizeof(int)) {
+    std::cout << "args:" << arg_len * sizeof(int) << std::endl;
+    if (stream->send(argTypes, 2) != arg_len) {
         return ERRNO_FAILED_SEND;
     }
-    // std::cout << "RET:" << arg_len * sizeof(int) << std::endl;
 
     if (!sig_only) {
         // TODO send params
@@ -164,7 +169,6 @@ int rpcTerminate() {
 }
 
 
-static TCPStream *server_connection = NULL;
 // Server functions
 int rpcInit() {
     TCPConnector *c = new TCPConnector();
@@ -181,6 +185,9 @@ int rpcInit() {
     send_int(stream, 0);
     send_int(stream, INIT);
 
+    get_int(stream);
+    get_int(stream);
+
     return RETVAL_SUCCESS;
 }
 
@@ -189,7 +196,19 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
         return ERRNO_FAILED_TO_CONNECT;
     }
 
-    return send_data(server_connection, REGISTER, true, name, argTypes, NULL);
+    int retval = send_data(server_connection, REGISTER, true, name, argTypes, NULL);
+    if (retval != RETVAL_SUCCESS) {
+        std::cout << "Failed to register" << std::endl;
+        return retval;
+    }
+
+    std::cout << "No int" << std::endl;
+    get_int(server_connection);
+    std::cout << "One int" << std::endl;
+    get_int(server_connection);
+    std::cout << "Two int" << std::endl;
+
+    return retval;
 }
 
 int rpcExecute() {

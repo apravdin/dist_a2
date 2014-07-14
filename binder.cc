@@ -12,6 +12,12 @@
 
 static map<std::string, std::vector<std::string> > registered_functions;
 
+void gen_sig(int *arg_types, int arg_len) {
+    int total_args = arg_len / sizeof(int);
+    for (int i = 0; i < total_args; i++) {
+        arg_types[i] &= ARG_TYPE_MASK;
+    }
+}
 
 void send_header(int sd, int len, int type) {
     write(sd, &len, sizeof(int));
@@ -95,11 +101,35 @@ int register_function(std::string &hash, std::string &server) {
 }
 
 int handle_register(int sd, int len, std::string &server_addr) {
+    std::cout << "Register" << std::endl;
     // Get signature
+    int arg_len = len - NAME_SIZE;
+
+    char name[NAME_SIZE + 1];
+    std::cout << "random location" <<  std::endl;
+    int *arg_types = new int[arg_len];
+
+    std::cout << "GETTING DATA" << std::endl;
+    get_data(sd, (void *)name, NAME_SIZE);
+    std::cout << "Gotz a name" << std::endl;
+    name[NAME_SIZE] = 0;
+
+    std::cout << "GETTING DATA" << std::endl;
+    get_data(sd, (void *) arg_types, arg_len);
+    std::cout << "Gotz the args" << std::endl;
+
+    // Mask out array lengths
+    std::cout << "Sig gen" << std::endl;
+    gen_sig(arg_types, arg_len);
+
+    // Generate a hash
     std::string hash;
+    std::cout << "HAsh gen" << std::endl;
+    get_hash(hash, name, arg_types, arg_len);
 
     // Get server lock
     // Add function to server
+    std::cout << "Final register:" << hash << std::endl;
     register_function(hash, server_addr);
     // Release server lock
 
@@ -108,6 +138,8 @@ int handle_register(int sd, int len, std::string &server_addr) {
 }
 
 int handle_init(int sd, int len) {
+    std::cout << "Server Init" << std::endl;
+
     // Get server addr
     std::string server_addr;
     get_client_addr(sd, server_addr);
@@ -123,14 +155,16 @@ int handle_init(int sd, int len) {
         if (len <= 0) {
             break;
         }
+        std::cout << "Got some len:" << msg_len << std::endl;
         len = read(sd, &type, sizeof(int));
         if (len <= 0) {
             break;
         }
-
+        std::cout << "Got some type:" << type << std::endl;
         // Continuously register unless connection is closed
         if (type == REGISTER) {
-            handle_register(sd, len, server_addr);
+            int retval = handle_register(sd, msg_len, server_addr);
+            send_header(sd, 0, retval);
         }
     }
 
@@ -149,24 +183,21 @@ int handle_lookup(int sd, int len) {
     int arg_len = len - NAME_SIZE;
 
     char name[NAME_SIZE + 1];
-    int *args_types = new int[arg_len];
+    int *arg_types = new int[arg_len];
 
     int retval = get_data(sd, (void *)name, NAME_SIZE);
     name[NAME_SIZE] = 0;
-    std::cout << "Got Name:"<< name << std::endl;
+    // std::cout << "Got Name:"<< name << std::endl;
 
-    retval = get_data(sd, (void *) args_types, arg_len);
-    std::cout << "First arg:"<< args_types[0] << std::endl;
+    retval = get_data(sd, (void *) arg_types, arg_len);
+    // std::cout << "First arg:"<< arg_types[0] << std::endl;
 
     // Mask out array lengths
-    int total_args = arg_len / sizeof(int);
-    for (int i = 0; i < total_args; i++) {
-        args_types[i] &= ARG_TYPE_MASK;
-    }
+    gen_sig(arg_types, arg_len);
 
     // Generate a hash
     std::string hash;
-    get_hash(hash, name, args_types, arg_len);
+    get_hash(hash, name, arg_types, arg_len);
 
     std::cout << "HASH:" << hash.length() << std::endl;
 
@@ -187,7 +218,7 @@ int handle_lookup(int sd, int len) {
 
     // Respond with status
 
-    delete[] args_types;
+    delete[] arg_types;
     return RETVAL_SUCCESS;
 }
 
