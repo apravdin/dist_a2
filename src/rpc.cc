@@ -12,7 +12,24 @@ int get_arg_num(int *argTypes) {
     while(argTypes[i] != 0) {
         i++;
     }
-    return i;
+    return i * sizeof(int);
+}
+
+int connect_to_binder(TCPConnector *c, TCPStream **stream) {
+    char *server_name = "127.0.0.1"; // getenv("BINDER_ADDRESS");
+    char *port = "61111"; // getenv("BINDER_PORT");
+    if (server_name == NULL || port == NULL) {
+        std::cerr << "Failed to find BINDER_ADDRESS or BINDER_PORT" << std::endl;
+        return ERRNO_ENV_VAR_NOT_SET;
+    }
+
+    *stream = c->connect(atoi(port), server_name);
+    if (stream == NULL) {
+        std::cerr << "Failed to connect" << std::endl;
+        return ERRNO_FAILED_TO_CONNECT;
+    }
+
+    return RETVAL_SUCCESS;
 }
 
 // Client functions
@@ -20,32 +37,31 @@ int rpcCall(char *name, int *argTypes, void **args) {
     // Initialize tcp connector
     TCPConnector *c = new TCPConnector();
     TCPStream *stream;
-    char *server_name = "127.0.0.1"; // getenv("BINDER_ADDRESS");
-    char *port = "53737"; // getenv("BINDER_PORT");
-#ifdef DEBUG
-    std::cout << "Connection to: " << server_name << ":" << port << std::endl;
-#endif
-    if (server_name == NULL || port == NULL) {
-        std::cerr << "Failed to find BINDER_ADDRESS or BINDER_PORT" << std::endl;
-        return 0;
+
+    int retval = connect_to_binder(c, &stream);
+
+    if (retval != RETVAL_SUCCESS) {
+        return retval;
     }
 
-    stream = c->connect(atoi(port), server_name);
-    if (stream == NULL) {
-        std::cerr << "Failed to connect" << std::endl;
-        return 0;
-    }
-
-
+    char sys_name[NAME_SIZE];
+    int name_len = strlen(name);
+    memcpy(sys_name, name, std::min(name_len + 1, NAME_SIZE));
 
     // Send function lookup to binder
-    int name_len = strlen(name);
     int arg_len = get_arg_num(argTypes);
-    int msg_len = name_len + arg_len;
+    int msg_len = NAME_SIZE + arg_len;
 
-    stream->send(&msg_len);
-    stream->send(name, name_len);
-    stream->send(argTypes, arg_len);
+    int type = LOOKUP;
+
+    retval = stream->send(&msg_len);
+    std::cout << "RET:" << retval << std::endl;
+    retval = stream->send(&type);
+    std::cout << "RET:" << retval << std::endl;
+    retval = stream->send(sys_name, NAME_SIZE);
+    std::cout << "RET:" << retval << std::endl;
+    retval = stream->send(argTypes, arg_len);
+    std::cout << "RET:" << retval << ":" << arg_len << std::endl;
 
 
     // Get binder lookup response
@@ -57,7 +73,7 @@ int rpcCall(char *name, int *argTypes, void **args) {
     while (bytes_read < msg_len) {
         len = stream->receive(buf, BUFFER_SIZE-1);
         if (len <= 0) {
-            return -1;
+            return ERRNO_FAILED_READ;
         }
 
         buf[len] = 0;
@@ -72,7 +88,6 @@ int rpcCall(char *name, int *argTypes, void **args) {
     // Get server response
 
     delete c;
-    return 0;
     return RETVAL_SUCCESS;
 }
 

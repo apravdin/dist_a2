@@ -3,14 +3,104 @@
 #include <cstring>
 #include <unistd.h>
 #include "tcpacceptor.h"
+#include <rpc.h>
+#include <rpc_errno.h>
 
 #define BUFFER_SIZE 256
 
-int process_data(int sd);
-int is_divider(char c);
-int totitle(char *buffer, int len, int status);
+
+
+int get_data(int sd, void *result, int data_len) {
+    char buffer[BUFFER_SIZE];
+    int len;
+    int bytes_read = 0;
+
+    std::cout << "Start read:"<< data_len << std::endl;
+    while (bytes_read < data_len) {
+        // Read from the socket
+        len = read(sd, buffer, data_len);
+        if (len <= 0) {
+            return ERRNO_FAILED_READ;
+        }
+
+        // Copy the read data into the result buffer
+        memcpy(((char *) result) + bytes_read, buffer, len);
+
+        // Increment the bytes read
+        bytes_read += len;
+
+        // Null terminate for debug purposes
+        buffer[len] = 0;
+        for (int i = 0; i < len; i++) {
+            std::cout << (int) buffer[i] << ",";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "End read"<< std::endl;
+    return bytes_read;
+}
+
+int handle_init(int sd, int len) {
+    return RETVAL_SUCCESS;
+}
+
+int handle_lookup(int sd, int len) {
+    std::cout << "Handling lookup"<< std::endl;
+    int arg_len = (len - NAME_SIZE);
+
+    char name[NAME_SIZE + 1];
+    int *args_types = new int[arg_len];
+
+    int retval = get_data(sd, (void *)name, NAME_SIZE);
+    name[NAME_SIZE] = 0;
+    std::cout << "Got Name:"<< name << std::endl;
+
+    retval = get_data(sd, (void *) args_types, arg_len);
+    std::cout << "First arg:"<< args_types[0] << std::endl;
+
+    // TODO handle retval
+    (void) retval;
+
+    delete[] args_types;
+    return RETVAL_SUCCESS;
+}
+
+int handle_register(int sd, int len) {
+    return RETVAL_SUCCESS;
+}
+
+
+int handle_request(int sd) {
+    int len;
+    int status = read(sd, &len, sizeof(len));
+    if (status <= 0) {
+        return ERRNO_FAILED_READ;
+    }
+    std::cout << "Got len:" << len << std::endl;
+
+    int type;
+    status = read(sd, &type, sizeof(type));
+    if (status <= 0) {
+        return ERRNO_FAILED_READ;
+    }
+    std::cout << "Got type:" << type << std::endl;
+
+    switch(type) {
+        case INIT:
+            return handle_init(sd, len);
+        case LOOKUP:
+            return handle_lookup(sd, len);
+        case REGISTER:
+            return handle_register(sd, len);
+        default:
+            std::cout << "Got invalid request:" << type << std::endl;
+            return BINDER_INVALID_COMMAND;
+    }
+}
+
 
 int main() {
+    int retval;
     TCPAcceptor *acceptor = new TCPAcceptor(12345);
     vector<int> active_socks;
 
@@ -51,19 +141,19 @@ int main() {
                         FD_SET(cursd, &total_set);
                         maxfd = max(maxfd, cursd);
                     }
-
-
                 }
 
                 // Iterate through all active sockets
                 for (std::vector<int>::iterator it = active_socks.begin() ; it != active_socks.end();) {
                     if (FD_ISSET(*it, &active_set)) {
-                        if (process_data(*it) != 0) {
-                            close(*it);
-                            active_socks.erase(it);
-                            FD_CLR(*it, &total_set);
-                            continue;
-                        }
+                        retval = handle_request(*it);
+
+                        // TODO handle retval
+                        (void) retval;
+                        close(*it);
+                        active_socks.erase(it);
+                        FD_CLR(*it, &total_set);
+                        continue;
                     }
                     ++it;
                 }
@@ -72,68 +162,4 @@ int main() {
     }
     std::cerr << "Failed to start server" << std::endl;
     return 0;
-}
-
-int process_data(int sd) {
-#ifdef DEBUG
-    std::cout << "Processing data: " << sd << std::endl;
-#endif
-    int msg_len;
-    int bytes_read = 0;
-    int len;
-    int status = 1;
-
-    char buffer[BUFFER_SIZE] = { 0 };
-
-    // Get user input
-    len = read(sd, &msg_len, sizeof(msg_len));
-    if (len <= 0) {
-        return -1;
-    }
-
-    write(sd, &msg_len, sizeof(msg_len));
-    while (bytes_read < msg_len) {
-        len = read(sd, buffer, BUFFER_SIZE-1);
-        if (len <= 0) {
-            return -1;
-        }
-
-        buffer[len] = 0;
-        bytes_read += len;
-#ifdef DEBUG
-        std::cout << "read: " << bytes_read << "/" << msg_len <<  std::endl;
-#endif
-        std::cout << buffer;
-        status = totitle(buffer, len, status);
-
-        write(sd, buffer, len);
-    }
-    std::cout << std::endl;
-
-    return 0;
-}
-
-// Set to title case
-int totitle(char *buffer, int len, int status = 1) {
-    for (int i = 0; i < len; i++) {
-        if (status && !is_divider(buffer[i])) {
-            buffer[i] = toupper(buffer[i]);
-            status = 0;
-        } else {
-            buffer[i] = tolower(buffer[i]);
-            status = is_divider(buffer[i]);
-        }
-    }
-    return status;
-}
-
-int is_divider(char c) {
-    switch(c) {
-        case ' ':
-            return 1;
-        case '-':
-            return 1;
-        default:
-            return 0;
-    }
 }

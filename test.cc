@@ -16,8 +16,8 @@
 int main() {
 
   int argTypes[3];
-  argTypes[0] = 51;
-  argTypes[1] = 52;
+  argTypes[0] = (int) 'a';
+  argTypes[1] = (int) 'b';
   argTypes[2] = 0;
 
   void *args[1];
@@ -28,7 +28,7 @@ int main() {
   /* test the return f0 */
   printf("\nEXPECTED return of f0 is: %d\n", -1);
   if (retval >= 0) {
-    printf("ACTUAL return of f0 is: %d\n", args[0]);
+    printf("ACTUAL return of f0 is: %d\n", *((int *)args));
   }
   else {
     printf("Error: %d\n", retval);

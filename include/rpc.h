@@ -7,6 +7,16 @@
 extern "C" {
 #endif
 
+#define LOOKUP              1
+#define EXECUTE             2
+#define EXECUTE_SUCCESS     3
+#define EXECUTE_FAILURE     4
+#define INIT                5
+#define REGISTER            6
+#define TERMINATE           7
+
+#define NAME_SIZE           64
+
 #define ARG_CHAR    1
 #define ARG_SHORT   2
 #define ARG_INT     3
