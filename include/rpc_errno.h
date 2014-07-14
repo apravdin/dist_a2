@@ -7,6 +7,7 @@
 #define ERRNO_ENV_VAR_NOT_SET   -1
 #define ERRNO_FAILED_TO_CONNECT -2
 #define ERRNO_FAILED_READ       -3
+#define ERRNO_FUNC_NOT_FOUND    -4
 
 
 // Binder errors

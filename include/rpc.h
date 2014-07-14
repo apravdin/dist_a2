@@ -17,6 +17,10 @@ extern "C" {
 
 #define NAME_SIZE           64
 
+#define ARG_TYPE_MASK       0xFFFF0000
+#define ARG_ARRAY_LEN_MASK  0x0000FFFF
+
+
 #define ARG_CHAR    1
 #define ARG_SHORT   2
 #define ARG_INT     3

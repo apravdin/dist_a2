@@ -81,7 +81,12 @@ int rpcCall(char *name, int *argTypes, void **args) {
         msg.append(buf, len);
     }
 
-    std::cout << "Server: " << msg << std::endl;
+    std::cout << "RETVAL:" << msg_len << std::endl;
+    if (msg_len == sizeof(int)) {
+        std::cout << "Server: " << *((int *)buf) << std::endl;
+    } else {
+        std::cout << "Server: " << msg << std::endl;
+    }
 
     // Send execute request to server
 

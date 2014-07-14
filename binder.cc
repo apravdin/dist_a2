@@ -5,10 +5,22 @@
 #include "tcpacceptor.h"
 #include <rpc.h>
 #include <rpc_errno.h>
+#include <pthread.h>
+#include <map>
 
 #define BUFFER_SIZE 256
 
+static map<std::string, std::vector<std::string> > registered_functions;
 
+void get_client_addr(int sd, std::string &result) {
+    struct sockaddr_in address;
+    socklen_t len = sizeof(address);
+    bzero(&address, sizeof(address));
+
+    getsockname(sd, (struct sockaddr*)&address, &len);
+
+    result.append(inet_ntoa(address.sin_addr));
+}
 
 int get_data(int sd, void *result, int data_len) {
     char buffer[BUFFER_SIZE];
@@ -40,13 +52,66 @@ int get_data(int sd, void *result, int data_len) {
     return bytes_read;
 }
 
+void get_hash(std::string &hash, char *name, int *arg_types, int arg_len) {
+    hash.clear();
+    hash.append(name, NAME_SIZE);
+    hash.append((char *) arg_types, arg_len);
+}
+
+void get_server(std::vector<std::string> &servers, std::string &result) {
+    result = servers.front();
+}
+
+int function_lookup(std::string &hash, std::string &result) {
+    std::map<std::string, std::vector<std::string> >::iterator it;
+    it = registered_functions.find(hash);
+
+    if (it != registered_functions.end()) {
+        get_server(it->second, result);
+        return RETVAL_SUCCESS;
+    } else {
+        return ERRNO_FUNC_NOT_FOUND;
+    }
+}
+
+int register_function(std::string &hash, std::string &server) {
+    std::map<std::string, std::vector<std::string> >::iterator it;
+    it = registered_functions.find(hash);
+
+    if (it != registered_functions.end()) {
+        it->second.push_back(hash);
+    } else {
+        std::vector<std::string> v;
+        v.push_back(server);
+        registered_functions.insert(std::pair<std::string, std::vector<std::string> >(hash, v));
+    }
+    return RETVAL_SUCCESS;
+}
+
 int handle_init(int sd, int len) {
+    // Get server addr
+    std::string server_addr;
+    get_client_addr(sd, server_addr);
+
+    // Get server lock
+    // Update servers with addr
+    // Release server lock
+
+    // Respond with status
+
+    // Keep connection alive
+        // handle request
+
+    // Get server lock
+    // Remove server functions
+    // Release server lock
+
     return RETVAL_SUCCESS;
 }
 
 int handle_lookup(int sd, int len) {
     std::cout << "Handling lookup"<< std::endl;
-    int arg_len = (len - NAME_SIZE);
+    int arg_len = len - NAME_SIZE;
 
     char name[NAME_SIZE + 1];
     int *args_types = new int[arg_len];
@@ -58,105 +123,111 @@ int handle_lookup(int sd, int len) {
     retval = get_data(sd, (void *) args_types, arg_len);
     std::cout << "First arg:"<< args_types[0] << std::endl;
 
-    // TODO handle retval
-    (void) retval;
+    // Mask out array lengths
+    int total_args = arg_len / sizeof(int);
+    for (int i = 0; i < total_args; i++) {
+        args_types[i] &= ARG_TYPE_MASK;
+    }
+
+    // Generate a hash
+    std::string hash;
+    get_hash(hash, name, args_types, arg_len);
+
+    std::cout << "HASH:" << hash.length() << std::endl;
+
+
+
+    // Get server lock
+    // Lookup the function
+    std::string server;
+    retval = function_lookup(hash, server);
+
+    if (retval != RETVAL_SUCCESS) {
+        len = sizeof(int);
+        write(sd, &len, sizeof(int));
+        write(sd, &retval, sizeof(int));
+    } else {
+        len = server.length();
+        write(sd, &len, sizeof(int));
+        write(sd, server.c_str(), server.length());
+    }
+
+    // Release server lock
+
+    // Respond with status
 
     delete[] args_types;
     return RETVAL_SUCCESS;
 }
 
-int handle_register(int sd, int len) {
+int handle_register(int sd, int len, std::string &server_addr) {
+    // Get signature
+    std::string hash;
+
+    // Get server lock
+    // Add function to server
+    register_function(hash, server_addr);
+    // Release server lock
+
+    // Respond with status
     return RETVAL_SUCCESS;
 }
 
-
-int handle_request(int sd) {
+void *handle_request(void *sd) {
+    int retval;
     int len;
-    int status = read(sd, &len, sizeof(len));
+
+    int status = read(*((int *)sd), &len, sizeof(len));
     if (status <= 0) {
-        return ERRNO_FAILED_READ;
+        retval = ERRNO_FAILED_READ;
+        return NULL;
     }
     std::cout << "Got len:" << len << std::endl;
 
     int type;
-    status = read(sd, &type, sizeof(type));
+    status = read(*((int *)sd), &type, sizeof(type));
     if (status <= 0) {
-        return ERRNO_FAILED_READ;
+        retval = ERRNO_FAILED_READ;
+        return NULL;
     }
     std::cout << "Got type:" << type << std::endl;
 
     switch(type) {
         case INIT:
-            return handle_init(sd, len);
+            retval = handle_init(*((int *)sd), len);
+            break;
         case LOOKUP:
-            return handle_lookup(sd, len);
-        case REGISTER:
-            return handle_register(sd, len);
+            retval = handle_lookup(*((int *)sd), len);
+            break;
         default:
             std::cout << "Got invalid request:" << type << std::endl;
-            return BINDER_INVALID_COMMAND;
+            retval = BINDER_INVALID_COMMAND;
+            break;
     }
+    // TODO handle retval
+    (void) retval;
+
+    // TODO respond to request
+    close(*((int *)sd));
+    return NULL;
 }
 
 
 int main() {
     int retval;
     TCPAcceptor *acceptor = new TCPAcceptor(12345);
-    vector<int> active_socks;
-
-    int main_socket;
-    int maxfd;
-    int cursd;
-    fd_set total_set, active_set;
-    FD_ZERO(&total_set);
-    FD_ZERO(&active_set);
-
-
-    int result = 0;
 
 
     if (acceptor->start() == 0) {
         acceptor->display_name();
         acceptor->display_port();
 
-        main_socket = acceptor->get_sd();
-        maxfd = main_socket;
-        FD_SET(main_socket, &total_set);
-
+        pthread_t handler;
         while(1) {
-            active_set = total_set;
-            result = select(maxfd+1, &active_set, NULL, NULL, NULL);
+            retval = acceptor->accept();
 
-            if (result > 0) {
-                if (FD_ISSET(main_socket, &active_set)) {
-#ifdef DEBUG
-                    std::cout << "Accepting" << std::endl;
-#endif
-                    // Accept connection
-                    cursd = acceptor->accept();
-                    if (cursd > 0) {
-                        active_socks.push_back(cursd);
-
-                        // set fd data
-                        FD_SET(cursd, &total_set);
-                        maxfd = max(maxfd, cursd);
-                    }
-                }
-
-                // Iterate through all active sockets
-                for (std::vector<int>::iterator it = active_socks.begin() ; it != active_socks.end();) {
-                    if (FD_ISSET(*it, &active_set)) {
-                        retval = handle_request(*it);
-
-                        // TODO handle retval
-                        (void) retval;
-                        close(*it);
-                        active_socks.erase(it);
-                        FD_CLR(*it, &total_set);
-                        continue;
-                    }
-                    ++it;
-                }
+            if (retval >= 0) {
+                pthread_create (&handler, NULL, handle_request, &retval);
             }
         }
     }
