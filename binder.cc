@@ -12,6 +12,12 @@
 
 static map<std::string, std::vector<std::string> > registered_functions;
 
+
+void send_header(int sd, int len, int type) {
+    write(sd, &len, sizeof(int));
+    write(sd, &type, sizeof(int));
+}
+
 void get_client_addr(int sd, std::string &result) {
     struct sockaddr_in address;
     socklen_t len = sizeof(address);
@@ -88,19 +94,48 @@ int register_function(std::string &hash, std::string &server) {
     return RETVAL_SUCCESS;
 }
 
+int handle_register(int sd, int len, std::string &server_addr) {
+    // Get signature
+    std::string hash;
+
+    // Get server lock
+    // Add function to server
+    register_function(hash, server_addr);
+    // Release server lock
+
+    // Respond with status
+    return RETVAL_SUCCESS;
+}
+
 int handle_init(int sd, int len) {
     // Get server addr
     std::string server_addr;
     get_client_addr(sd, server_addr);
 
-    // Get server lock
-    // Update servers with addr
-    // Release server lock
-
     // Respond with status
+    send_header(sd, 0, RETVAL_SUCCESS);
 
     // Keep connection alive
-        // handle request
+    int msg_len;
+    int type;
+    while (true) {
+        len = read(sd, &msg_len, sizeof(int));
+        if (len <= 0) {
+            break;
+        }
+        len = read(sd, &type, sizeof(int));
+        if (len <= 0) {
+            break;
+        }
+
+        // Continuously register unless connection is closed
+        if (type == REGISTER) {
+            handle_register(sd, len, server_addr);
+        }
+    }
+
+    std::cout << "Closing connection to server:" << server_addr << std::endl;
+
 
     // Get server lock
     // Remove server functions
@@ -135,8 +170,6 @@ int handle_lookup(int sd, int len) {
 
     std::cout << "HASH:" << hash.length() << std::endl;
 
-
-
     // Get server lock
     // Lookup the function
     std::string server;
@@ -144,11 +177,9 @@ int handle_lookup(int sd, int len) {
 
     if (retval != RETVAL_SUCCESS) {
         len = sizeof(int);
-        write(sd, &len, sizeof(int));
-        write(sd, &retval, sizeof(int));
+        send_header(sd, 0, retval);
     } else {
-        len = server.length();
-        write(sd, &len, sizeof(int));
+        send_header(sd, server.length(), retval);
         write(sd, server.c_str(), server.length());
     }
 
@@ -160,54 +191,39 @@ int handle_lookup(int sd, int len) {
     return RETVAL_SUCCESS;
 }
 
-int handle_register(int sd, int len, std::string &server_addr) {
-    // Get signature
-    std::string hash;
-
-    // Get server lock
-    // Add function to server
-    register_function(hash, server_addr);
-    // Release server lock
-
-    // Respond with status
-    return RETVAL_SUCCESS;
-}
 
 void *handle_request(void *sd) {
-    int retval;
-    int len;
+    int socket = *((int *)sd);
 
-    int status = read(*((int *)sd), &len, sizeof(len));
+    // Get the length of the message
+    int len;
+    int status = read(socket, &len, sizeof(len));
     if (status <= 0) {
-        retval = ERRNO_FAILED_READ;
         return NULL;
     }
     std::cout << "Got len:" << len << std::endl;
 
+    // Get the message type
     int type;
-    status = read(*((int *)sd), &type, sizeof(type));
+    status = read(socket, &type, sizeof(type));
     if (status <= 0) {
-        retval = ERRNO_FAILED_READ;
         return NULL;
     }
     std::cout << "Got type:" << type << std::endl;
 
     switch(type) {
         case INIT:
-            retval = handle_init(*((int *)sd), len);
+            handle_init(socket, len);
             break;
         case LOOKUP:
-            retval = handle_lookup(*((int *)sd), len);
+            handle_lookup(socket, len);
             break;
         default:
             std::cout << "Got invalid request:" << type << std::endl;
-            retval = BINDER_INVALID_COMMAND;
+            send_header(socket, 0, BINDER_INVALID_COMMAND);
             break;
     }
-    // TODO handle retval
-    (void) retval;
 
-    // TODO respond to request
     close(*((int *)sd));
     return NULL;
 }

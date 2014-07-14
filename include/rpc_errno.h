@@ -12,6 +12,6 @@
 
 
 // Binder errors
-#define BINDER_INVALID_COMMAND -1;
+#define BINDER_INVALID_COMMAND -1
 
 #endif /* RPC_ERRNO_H */
