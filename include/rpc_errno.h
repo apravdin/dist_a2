@@ -8,6 +8,7 @@
 #define ERRNO_FAILED_TO_CONNECT -2
 #define ERRNO_FAILED_READ       -3
 #define ERRNO_FUNC_NOT_FOUND    -4
+#define ERRNO_FAILED_SEND       -5
 
 
 // Binder errors

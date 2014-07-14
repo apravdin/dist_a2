@@ -32,44 +32,23 @@ int connect_to_binder(TCPConnector *c, TCPStream **stream) {
     return RETVAL_SUCCESS;
 }
 
-// Client functions
-int rpcCall(char *name, int *argTypes, void **args) {
-    // Initialize tcp connector
-    TCPConnector *c = new TCPConnector();
-    TCPStream *stream;
-
-    int retval = connect_to_binder(c, &stream);
-
-    if (retval != RETVAL_SUCCESS) {
-        return retval;
-    }
-
-    char sys_name[NAME_SIZE];
+void copy_name(char *sys_name, char *name) {
+    memset(sys_name, 0, NAME_SIZE);
     int name_len = strlen(name);
     memcpy(sys_name, name, std::min(name_len + 1, NAME_SIZE));
+}
 
-    // Send function lookup to binder
-    int arg_len = get_arg_num(argTypes);
-    int msg_len = NAME_SIZE + arg_len;
+int get_int(TCPStream *stream) {
+    int msg;
+    return read(stream->get_sd(), &msg, sizeof(msg));
+}
 
-    int type = LOOKUP;
-
-    retval = stream->send(&msg_len);
-    std::cout << "RET:" << retval << std::endl;
-    retval = stream->send(&type);
-    std::cout << "RET:" << retval << std::endl;
-    retval = stream->send(sys_name, NAME_SIZE);
-    std::cout << "RET:" << retval << std::endl;
-    retval = stream->send(argTypes, arg_len);
-    std::cout << "RET:" << retval << ":" << arg_len << std::endl;
-
-
-    // Get binder lookup response
+int get_str(TCPStream *stream, std::string &msg, int msg_len) {
     char buf[BUFFER_SIZE];
     int bytes_read = 0;
     int len;
-    std::string msg = "";
-    read(stream->get_sd(), &msg_len, sizeof(msg_len));
+
+    msg.clear();
     while (bytes_read < msg_len) {
         len = stream->receive(buf, BUFFER_SIZE-1);
         if (len <= 0) {
@@ -81,10 +60,77 @@ int rpcCall(char *name, int *argTypes, void **args) {
         msg.append(buf, len);
     }
 
-    std::cout << "RETVAL:" << msg_len << std::endl;
-    if (msg_len == sizeof(int)) {
-        std::cout << "Server: " << *((int *)buf) << std::endl;
+    return bytes_read;
+}
+
+int send_int(TCPStream *stream, int data) {
+    return stream->send(&data);
+}
+
+int send_data(TCPStream *stream, int type, bool sig_only, char *name, int *argTypes, void **args) {
+    char sys_name[NAME_SIZE];
+    copy_name(sys_name, name);
+
+    // Send function lookup to binder
+    int arg_len = get_arg_num(argTypes);
+
+    if (!sig_only) {
+        // TODO calc param len
+    }
+
+    int msg_len = NAME_SIZE + arg_len;
+
+    if (stream->send(&msg_len) != sizeof(msg_len)) {
+        return ERRNO_FAILED_SEND;
+    }
+    // std::cout << "RET:" << 4 << std::endl;
+    if (stream->send(&type) != sizeof(type)) {
+        return ERRNO_FAILED_SEND;
+    }
+    // std::cout << "RET:" << 4 << std::endl;
+    if (stream->send(sys_name, NAME_SIZE) != NAME_SIZE) {
+        return ERRNO_FAILED_SEND;
+    }
+    // std::cout << "RET:" << NAME_SIZE << std::endl;
+    if (stream->send(argTypes, arg_len) != arg_len * sizeof(int)) {
+        return ERRNO_FAILED_SEND;
+    }
+    // std::cout << "RET:" << arg_len * sizeof(int) << std::endl;
+
+    if (!sig_only) {
+        // TODO send params
+    }
+    return RETVAL_SUCCESS;
+}
+
+// Client functions
+int rpcCall(char *name, int *argTypes, void **args) {
+    // Initialize tcp connector
+    TCPConnector *c = new TCPConnector();
+    TCPStream *stream;
+
+    int retval = connect_to_binder(c, &stream);
+    if (retval != RETVAL_SUCCESS) {
+        return retval;
+    }
+
+    // Send lookup request
+    retval = send_data(stream, LOOKUP, true, name, argTypes, NULL);
+    if (retval != RETVAL_SUCCESS) {
+        return retval;
+    }
+
+    // Get binder lookup response
+    std::string msg;
+    int msg_len = get_int(stream);
+    int type = get_int(stream);
+
+    // If return value is an error code
+    if (type != RETVAL_SUCCESS) {
+        std::cout << "Server: Lookup failed" << std::endl;
+        return ERRNO_FUNC_NOT_FOUND;
     } else {
+        get_str(stream, msg, msg_len);
         std::cout << "Server: " << msg << std::endl;
     }
 
@@ -101,17 +147,49 @@ int rpcCacheCall(char* name, int* argTypes, void** args) {
 }
 
 int rpcTerminate() {
+    // Initialize tcp connector
+    TCPConnector *c = new TCPConnector();
+    TCPStream *stream;
+
+    int retval = connect_to_binder(c, &stream);
+
+    if (retval != RETVAL_SUCCESS) {
+        return retval;
+    }
+
+    send_int(stream, 0);
+    send_int(stream, TERMINATE);
+
     return RETVAL_SUCCESS;
 }
 
 
+static TCPStream *server_connection = NULL;
 // Server functions
 int rpcInit() {
+    TCPConnector *c = new TCPConnector();
+    TCPStream *stream;
+
+    int retval = connect_to_binder(c, &stream);
+
+    if (retval != RETVAL_SUCCESS) {
+        return ERRNO_FAILED_TO_CONNECT;
+    }
+
+    server_connection = stream;
+
+    send_int(stream, 0);
+    send_int(stream, INIT);
+
     return RETVAL_SUCCESS;
 }
 
 int rpcRegister(char* name, int* argTypes, skeleton f) {
-    return RETVAL_SUCCESS;
+    if (server_connection == NULL) {
+        return ERRNO_FAILED_TO_CONNECT;
+    }
+
+    return send_data(server_connection, REGISTER, true, name, argTypes, NULL);
 }
 
 int rpcExecute() {
