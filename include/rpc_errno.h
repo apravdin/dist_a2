@@ -9,7 +9,12 @@
 #define ERRNO_FAILED_READ       -3
 #define ERRNO_FUNC_NOT_FOUND    -4
 #define ERRNO_FAILED_SEND       -5
+#define ERRNO_NO_SPACE          -6
 
+
+// RPC errors
+#define ERRNO_REGISTER_FAILED   -10
+#define ERRNO_INIT_FAILED       -11
 
 // Binder errors
 #define BINDER_INVALID_COMMAND -1

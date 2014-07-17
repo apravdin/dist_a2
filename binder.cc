@@ -12,6 +12,51 @@
 
 static map<std::string, std::vector<std::string> > registered_functions;
 
+
+int get_data(int sd, void *result, int data_len) {
+    char buffer[BUFFER_SIZE];
+    int len;
+    int bytes_read = 0;
+
+    std::cout << "Start read:"<< data_len << std::endl;
+    while (bytes_read < data_len) {
+        // Read from the socket
+        len = read(sd, buffer, data_len);
+        if (len <= 0) {
+            return ERRNO_FAILED_READ;
+        }
+
+        // Copy the read data into the result buffer
+        memcpy(((char *) result) + bytes_read, buffer, len);
+
+        // Null terminate for debug purposes
+        // buffer[len] = 0;
+        // for (int i = 0; i < len; i++) {
+        //     std::cout << (int) buffer[i] << ",";
+        // }
+        // std::cout << std::endl;
+
+        // Increment the bytes read
+        bytes_read += len;
+    }
+    std::cout << "End read:"<< bytes_read <<  std::endl;
+    return bytes_read;
+}
+
+int get_sig_data(int sd, char *name, int *arg_types, int arg_len) {
+    int retval = get_data(sd, (void *)name, NAME_SIZE);
+    if (retval < 0) {
+        // return retval;
+    }
+
+    retval = get_data(sd, (void *) arg_types, arg_len);
+    if (retval < 0) {
+        // return retval;
+    }
+
+    return RETVAL_SUCCESS;
+}
+
 void gen_sig(int *arg_types, int arg_len) {
     int total_args = arg_len / sizeof(int);
     for (int i = 0; i < total_args; i++) {
@@ -34,40 +79,25 @@ void get_client_addr(int sd, std::string &result) {
     result.append(inet_ntoa(address.sin_addr));
 }
 
-int get_data(int sd, void *result, int data_len) {
-    char buffer[BUFFER_SIZE];
-    int len;
-    int bytes_read = 0;
-
-    std::cout << "Start read:"<< data_len << std::endl;
-    while (bytes_read < data_len) {
-        // Read from the socket
-        len = read(sd, buffer, data_len);
-        if (len <= 0) {
-            return ERRNO_FAILED_READ;
-        }
-
-        // Copy the read data into the result buffer
-        memcpy(((char *) result) + bytes_read, buffer, len);
-
-        // Increment the bytes read
-        bytes_read += len;
-
-        // Null terminate for debug purposes
-        buffer[len] = 0;
-        for (int i = 0; i < len; i++) {
-            std::cout << (int) buffer[i] << ",";
-        }
-        std::cout << std::endl;
-    }
-    std::cout << "End read"<< std::endl;
-    return bytes_read;
-}
-
-void get_hash(std::string &hash, char *name, int *arg_types, int arg_len) {
+int get_hash(int sd, std::string &hash, int arg_len) {
     hash.clear();
+
+    char name[NAME_SIZE];
+    int *arg_types = new int[arg_len / sizeof(int)];
+
+    int retval = get_sig_data(sd, name, arg_types, arg_len);
+    if (retval < 0) {
+        delete[] arg_types;
+        return retval;
+    }
+
+    gen_sig(arg_types, arg_len);
+
     hash.append(name, NAME_SIZE);
     hash.append((char *) arg_types, arg_len);
+
+    delete[] arg_types;
+    return RETVAL_SUCCESS;
 }
 
 void get_server(std::vector<std::string> &servers, std::string &result) {
@@ -93,48 +123,31 @@ int register_function(std::string &hash, std::string &server) {
     if (it != registered_functions.end()) {
         it->second.push_back(hash);
     } else {
-        std::vector<std::string> v;
-        v.push_back(server);
-        registered_functions.insert(std::pair<std::string, std::vector<std::string> >(hash, v));
+        std::vector<std::string> *v = new std::vector<std::string>;
+        if (v == NULL) {
+            return ERRNO_NO_SPACE;
+        }
+
+        v->push_back(server);
+        registered_functions.insert(std::pair<std::string, std::vector<std::string> >(hash, *v));
     }
     return RETVAL_SUCCESS;
 }
 
 int handle_register(int sd, int len, std::string &server_addr) {
     std::cout << "Register" << std::endl;
-    // Get signature
     int arg_len = len - NAME_SIZE;
-
-    char name[NAME_SIZE + 1];
-    std::cout << "random location" <<  std::endl;
-    int *arg_types = new int[arg_len];
-
-    std::cout << "GETTING DATA" << std::endl;
-    get_data(sd, (void *)name, NAME_SIZE);
-    std::cout << "Gotz a name" << std::endl;
-    name[NAME_SIZE] = 0;
-
-    std::cout << "GETTING DATA" << std::endl;
-    get_data(sd, (void *) arg_types, arg_len);
-    std::cout << "Gotz the args" << std::endl;
-
-    // Mask out array lengths
-    std::cout << "Sig gen" << std::endl;
-    gen_sig(arg_types, arg_len);
 
     // Generate a hash
     std::string hash;
-    std::cout << "HAsh gen" << std::endl;
-    get_hash(hash, name, arg_types, arg_len);
+    get_hash(sd, hash, arg_len);
 
     // Get server lock
     // Add function to server
-    std::cout << "Final register:" << hash << std::endl;
-    register_function(hash, server_addr);
+    int retval = register_function(hash, server_addr);
     // Release server lock
 
-    // Respond with status
-    return RETVAL_SUCCESS;
+    return retval;
 }
 
 int handle_init(int sd, int len) {
@@ -155,12 +168,10 @@ int handle_init(int sd, int len) {
         if (len <= 0) {
             break;
         }
-        std::cout << "Got some len:" << msg_len << std::endl;
         len = read(sd, &type, sizeof(int));
         if (len <= 0) {
             break;
         }
-        std::cout << "Got some type:" << type << std::endl;
         // Continuously register unless connection is closed
         if (type == REGISTER) {
             int retval = handle_register(sd, msg_len, server_addr);
@@ -182,65 +193,46 @@ int handle_lookup(int sd, int len) {
     std::cout << "Handling lookup"<< std::endl;
     int arg_len = len - NAME_SIZE;
 
-    char name[NAME_SIZE + 1];
-    int *arg_types = new int[arg_len];
-
-    int retval = get_data(sd, (void *)name, NAME_SIZE);
-    name[NAME_SIZE] = 0;
-    // std::cout << "Got Name:"<< name << std::endl;
-
-    retval = get_data(sd, (void *) arg_types, arg_len);
-    // std::cout << "First arg:"<< arg_types[0] << std::endl;
-
-    // Mask out array lengths
-    gen_sig(arg_types, arg_len);
-
     // Generate a hash
     std::string hash;
-    get_hash(hash, name, arg_types, arg_len);
+    get_hash(sd, hash, arg_len);
 
-    std::cout << "HASH:" << hash.length() << std::endl;
-
-    // Get server lock
     // Lookup the function
     std::string server;
-    retval = function_lookup(hash, server);
+    // Get server lock
+    int retval = function_lookup(hash, server);
+    // Release server lock
 
+    // Respond with status
     if (retval != RETVAL_SUCCESS) {
         len = sizeof(int);
         send_header(sd, 0, retval);
     } else {
         send_header(sd, server.length(), retval);
-        write(sd, server.c_str(), server.length());
+        retval = write(sd, server.c_str(), server.length());
     }
 
-    // Release server lock
-
-    // Respond with status
-
-    delete[] arg_types;
     return RETVAL_SUCCESS;
 }
 
 
 void *handle_request(void *sd) {
+    try {
     int socket = *((int *)sd);
 
     // Get the length of the message
     int len;
-    int status = read(socket, &len, sizeof(len));
+    int status = read(socket, &len, sizeof(int));
     if (status <= 0) {
         return NULL;
     }
-    std::cout << "Got len:" << len << std::endl;
 
     // Get the message type
     int type;
-    status = read(socket, &type, sizeof(type));
+    status = read(socket, &type, sizeof(int));
     if (status <= 0) {
         return NULL;
     }
-    std::cout << "Got type:" << type << std::endl;
 
     switch(type) {
         case INIT:
@@ -254,30 +246,37 @@ void *handle_request(void *sd) {
             send_header(socket, 0, BINDER_INVALID_COMMAND);
             break;
     }
-
-    close(*((int *)sd));
+    std::cout << "Closing sd:" << socket << std::endl;
+    close(socket);
     return NULL;
 }
 
 
 int main() {
+    signal(SIGPIPE, SIG_IGN);
     int retval;
     TCPAcceptor *acceptor = new TCPAcceptor(12345);
+    try {
+        if (acceptor->start() == 0) {
+            acceptor->display_name();
+            acceptor->display_port();
 
-
-    if (acceptor->start() == 0) {
-        acceptor->display_name();
-        acceptor->display_port();
-
-        pthread_t handler;
-        while(1) {
-            retval = acceptor->accept();
-
-            if (retval >= 0) {
-                pthread_create (&handler, NULL, handle_request, &retval);
+            pthread_t handler[100];
+            int i = 0;
+            while(1) {
+                retval = acceptor->accept();
+                if (retval >= 0) {
+                    pthread_create (&(handler[i]), NULL, handle_request, &retval);
+                    i++;
+                }
+                pthread_join(handler[i-1], NULL);
             }
         }
+        std::cerr << "Failed to start server" << std::endl;
+
+    } catch (int e) {
+        std::cout << "Exception Caught:" << e << std::endl;
     }
-    std::cerr << "Failed to start server" << std::endl;
+
     return 0;
 }

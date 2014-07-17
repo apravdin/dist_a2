@@ -24,7 +24,7 @@ int TCPStream::send(const int *val) {
 }
 
 int TCPStream::send(const int *buffer, int len) {
-    return ::write(this->m_sd, buffer, sizeof(int) * len);
+    return ::write(this->m_sd, buffer, len * sizeof(int));
 }
 
 int TCPStream::receive(char *buffer, int len) {

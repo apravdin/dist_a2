@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <rpc_errno.h>
 #include <rpc.h>
+#include <cassert>
 
 static TCPStream *server_connection = NULL;
 void rpcReset() {
@@ -17,7 +18,7 @@ int get_arg_num(int *argTypes) {
     while(argTypes[i] != 0) {
         i++;
     }
-    return i * sizeof(int);
+    return i;
 }
 
 int connect_to_binder(TCPConnector *c, TCPStream **stream) {
@@ -45,7 +46,8 @@ void copy_name(char *sys_name, char *name) {
 
 int get_int(TCPStream *stream) {
     int msg;
-    return read(stream->get_sd(), &msg, sizeof(msg));
+    read(stream->get_sd(), &msg, sizeof(msg));
+    return msg;
 }
 
 int get_str(TCPStream *stream, std::string &msg, int msg_len) {
@@ -83,7 +85,7 @@ int send_data(TCPStream *stream, int type, bool sig_only, char *name, int *argTy
         // TODO calc param len
     }
 
-    int msg_len = NAME_SIZE + arg_len;
+    int msg_len = NAME_SIZE + arg_len * sizeof(int);
 
     std::cout << "msg_len:" << msg_len << std::endl;
     if (stream->send(&msg_len) != sizeof(msg_len)) {
@@ -97,8 +99,8 @@ int send_data(TCPStream *stream, int type, bool sig_only, char *name, int *argTy
     if (stream->send(sys_name, NAME_SIZE) != NAME_SIZE) {
         return ERRNO_FAILED_SEND;
     }
-    std::cout << "args:" << arg_len * sizeof(int) << std::endl;
-    if (stream->send(argTypes, 2) != arg_len) {
+    std::cout << "args:" << arg_len  << std::endl;
+    if (stream->send(argTypes, arg_len) != arg_len * sizeof(int)) {
         return ERRNO_FAILED_SEND;
     }
 
@@ -128,11 +130,12 @@ int rpcCall(char *name, int *argTypes, void **args) {
     // Get binder lookup response
     std::string msg;
     int msg_len = get_int(stream);
-    int type = get_int(stream);
+    int type = 99;
+    type = get_int(stream);
 
     // If return value is an error code
     if (type != RETVAL_SUCCESS) {
-        std::cout << "Server: Lookup failed" << std::endl;
+        std::cout << "Server: Lookup failed:" << msg_len << " " << type << std::endl;
         return ERRNO_FUNC_NOT_FOUND;
     } else {
         get_str(stream, msg, msg_len);
@@ -185,8 +188,14 @@ int rpcInit() {
     send_int(stream, 0);
     send_int(stream, INIT);
 
-    get_int(stream);
-    get_int(stream);
+    retval = get_int(stream);
+    if (retval != 0) {
+        return ERRNO_INIT_FAILED;
+    }
+    retval = get_int(stream);
+    if (retval != RETVAL_SUCCESS) {
+        return ERRNO_INIT_FAILED;
+    }
 
     return RETVAL_SUCCESS;
 }
@@ -198,15 +207,17 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 
     int retval = send_data(server_connection, REGISTER, true, name, argTypes, NULL);
     if (retval != RETVAL_SUCCESS) {
-        std::cout << "Failed to register" << std::endl;
         return retval;
     }
 
-    std::cout << "No int" << std::endl;
-    get_int(server_connection);
-    std::cout << "One int" << std::endl;
-    get_int(server_connection);
-    std::cout << "Two int" << std::endl;
+    retval = get_int(server_connection);
+    if (retval != 0) {
+        return ERRNO_REGISTER_FAILED;
+    }
+    retval = get_int(server_connection);
+    if (retval != RETVAL_SUCCESS) {
+        return ERRNO_REGISTER_FAILED;
+    }
 
     return retval;
 }
