@@ -44,10 +44,12 @@ TCPStream *TCPConnector::connect(int port, const char *server) {
     int sd = socket(DOMAIN, TYPE, PROTOCOL);
     if (sd == -1) {
         std::cerr << "Failed to create a socket" << std::endl;
+        return NULL;
     } else {
 
         // connect the socket
         if (::connect(sd, (struct sockaddr*)&address, sizeof(address)) != 0) {
+            std::cerr << "Failed to connect" << std::endl;
             return NULL;
         }
     }

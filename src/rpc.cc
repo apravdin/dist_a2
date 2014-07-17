@@ -137,8 +137,8 @@ int connect_to_binder(TCPConnector *c, TCPStream **stream) {
     }
 
     *stream = c->connect(atoi(port), server_name);
-    if (stream == NULL) {
-        std::cerr << "Failed to connect" << std::endl;
+    if (*stream == NULL) {
+        std::cerr << "Failed to connect to binder" << std::endl;
         return ERRNO_FAILED_TO_CONNECT;
     }
 
@@ -184,7 +184,6 @@ int send_int(TCPStream *stream, int data) {
 int send_hash(TCPStream *stream, int type, std::string &hash) {
 
     int hash_len = hash.length();
-    std::cout << "Sending:" << hash_len << ":" << hash << std::endl;
     if (stream->send(&hash_len) != sizeof(int)) {
         return ERRNO_FAILED_SEND;
     }
@@ -295,7 +294,7 @@ int rpcCall(char *name, int *argTypes, void **args) {
 
     int retval = connect_to_binder(c, &stream);
     if (retval != RETVAL_SUCCESS) {
-        return retval;
+        return ERRNO_FAILED_TO_CONNECT;
     }
 
     // Generate the function hash
@@ -324,7 +323,10 @@ int rpcCall(char *name, int *argTypes, void **args) {
 
     delete stream;
 
-    stream = c->connect(port, server.c_str());
+    *stream = c->connect(port, server.c_str());
+    if (*stream == NULL) {
+        return ERRNO_FAILED_TO_CONNECT;
+    }
 
     // Parse arguments and send
     int data_len = get_arg_len(argTypes);
