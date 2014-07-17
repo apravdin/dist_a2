@@ -40,10 +40,6 @@ TCPStream *TCPConnector::connect(int port, const char *server) {
         return NULL;
     }
 
-#ifdef DEBUG
-    inet_pton(PF_INET, "127.0.0.1", &(address.sin_addr));
-#endif
-
     // Create a socket
     int sd = socket(DOMAIN, TYPE, PROTOCOL);
     if (sd == -1) {
@@ -54,10 +50,6 @@ TCPStream *TCPConnector::connect(int port, const char *server) {
         if (::connect(sd, (struct sockaddr*)&address, sizeof(address)) != 0) {
             return NULL;
         }
-
-#ifdef DEBUG
-        std::cout << "Created socket: " << sd << std::endl;
-#endif
     }
 
     // Create a new stream and return it to the client

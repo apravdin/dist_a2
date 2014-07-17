@@ -15,6 +15,11 @@ static TCPStream *server_connection = NULL;
 static std::map<std::string, skeleton> server_functions;
 
 
+void send_msg_header(int sd, int len, int type) {
+    write(sd, &len, sizeof(int));
+    write(sd, &type, sizeof(int));
+}
+
 unsigned int get_arg_num(int *argTypes) {
     unsigned int i = 0;
     while(argTypes[i] != 0) {
@@ -194,13 +199,16 @@ int send_hash(TCPStream *stream, int type, std::string &hash) {
 }
 
 int send_data(TCPStream *stream, char *name, int *argTypes, char *args, int data_len) {
-    int name_len = strlen(name);
-    int arg_len = get_arg_num(argTypes);
+    int name_len = strlen(name) + 1;
+    int arg_len = get_arg_num(argTypes) + 1;
     int total_len = name_len + arg_len + data_len;
     int type = EXECUTE;
 
     stream->send(&total_len);
     stream->send(&type);
+
+    stream->send(&name_len);
+    stream->send(name, name_len);
 
     stream->send(&arg_len);
     stream->send(argTypes, arg_len);
@@ -228,6 +236,52 @@ int send_data(TCPStream *stream, char *name, int *argTypes, char *args, int data
 void *execute(void *sd) {
     int socket = *((int *)sd);
 
+    int msg_len;
+    int type;
+    int name_len;
+    int arg_len;
+    int data_len;
+
+    get_msg_data(socket, &msg_len, sizeof(int));
+    get_msg_data(socket, &type, sizeof(int));
+
+    if (type != EXECUTE) {
+        std::cout << "INVALID EXECUTE COMMAND" << std::endl;
+        return NULL;
+    }
+
+
+    get_msg_data(socket, &name_len, sizeof(int));
+    char *name = new char[name_len];
+    get_msg_data(socket, &name, name_len);
+
+    get_msg_data(socket, &arg_len, sizeof(int));
+    int *argTypes = new int[arg_len];
+    get_msg_data(socket, &argTypes, arg_len * sizeof(int));
+
+    get_msg_data(socket, &data_len, sizeof(int));
+    void **args = (void **) new char[data_len];
+    get_msg_data(socket, &args, data_len);
+
+    std::string hash;
+    get_hash(hash, name, argTypes);
+
+    map<std::string, skeleton>::iterator it;
+    it = server_functions.find(hash);
+    if (it == server_functions.end()) {
+        send_msg_header(socket, sizeof(int), EXECUTE_FAILURE);
+        int errno = ERRNO_FUNC_NOT_FOUND;
+        write(socket, &errno, sizeof(int));
+        return NULL;
+    }
+
+    skeleton f = it->second;
+
+    f(argTypes, args);
+
+    send_msg_header(socket, data_len, EXECUTE_SUCCESS);
+    write(socket, args, data_len);
+
     close(socket);
     return NULL;
 }
@@ -252,7 +306,8 @@ int rpcCall(char *name, int *argTypes, void **args) {
 
 
     // Get binder lookup response
-    std::string msg;
+    std::string server;
+    std::string port;
     int msg_len = get_int(stream);
     int type = get_int(stream);
 
@@ -261,11 +316,24 @@ int rpcCall(char *name, int *argTypes, void **args) {
         std::cout << "Server: Lookup failed:" << msg_len << " " << type << std::endl;
         return ERRNO_FUNC_NOT_FOUND;
     } else {
-        get_str(stream, msg, msg_len);
-        std::cout << "Server: " << msg << std::endl;
+        get_str(stream, server, msg_len);
+        std::cout << "Server: " << server << std::endl;
+    }
+
+    msg_len = get_int(stream);
+    type = get_int(stream);
+    if (type != RETVAL_SUCCESS) {
+        std::cout << "Server: Lookup failed:" << msg_len << " " << type << std::endl;
+        return ERRNO_FUNC_NOT_FOUND;
+    } else {
+        get_str(stream, port, msg_len);
+        std::cout << "Port: " << port << std::endl;
     }
 
 
+    delete stream;
+
+    stream = c->connect(atoi(port.c_str()), server.c_str());
 
     // Parse arguments and send
     int data_len = get_arg_len(argTypes);
@@ -278,6 +346,11 @@ int rpcCall(char *name, int *argTypes, void **args) {
     send_data(stream, name, argTypes, data, data_len);
 
     // Get server response
+    msg_len = get_int(stream);
+    type = get_int(stream);
+
+    stream->receive((char *) args, msg_len);
+
 
     delete c;
     delete[] data;
