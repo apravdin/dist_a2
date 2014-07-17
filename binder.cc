@@ -19,7 +19,7 @@ int get_data(int sd, void *result, int data_len) {
     int len;
     int bytes_read = 0;
 
-    std::cout << "Start read:"<< data_len << std::endl;
+    // std::cout << "Start read:"<< data_len << std::endl;
     while (bytes_read < data_len) {
         // Read from the socket
         len = read(sd, buffer, data_len);
@@ -40,29 +40,22 @@ int get_data(int sd, void *result, int data_len) {
         // Increment the bytes read
         bytes_read += len;
     }
-    std::cout << "End read:"<< bytes_read <<  std::endl;
+    // std::cout << "End read:"<< bytes_read <<  std::endl;
     return bytes_read;
 }
 
-int get_sig_data(int sd, char *name, int *arg_types, int arg_len) {
-    int retval = get_data(sd, (void *)name, NAME_SIZE);
-    if (retval < 0) {
-        // return retval;
+int get_hash(int sd, std::string &hash, int msg_len) {
+    hash.clear();
+
+    char *msg = new char[msg_len];
+
+    int retval = get_data(sd, msg, msg_len);
+    if (retval == msg_len) {
+        hash.append(msg, msg_len);
     }
 
-    retval = get_data(sd, (void *) arg_types, arg_len);
-    if (retval < 0) {
-        // return retval;
-    }
-
+    delete[] msg;
     return RETVAL_SUCCESS;
-}
-
-void gen_sig(int *arg_types, int arg_len) {
-    int total_args = arg_len / sizeof(int);
-    for (int i = 0; i < total_args; i++) {
-        arg_types[i] &= ARG_TYPE_MASK;
-    }
 }
 
 void send_header(int sd, int len, int type) {
@@ -80,31 +73,17 @@ void get_client_addr(int sd, std::string &result) {
     result.append(inet_ntoa(address.sin_addr));
 }
 
-int get_hash(int sd, std::string &hash, int arg_len) {
-    hash.clear();
-
-    char name[NAME_SIZE];
-    int *arg_types = new int[arg_len / sizeof(int)];
-
-    int retval = get_sig_data(sd, name, arg_types, arg_len);
-    if (retval < 0) {
-        delete[] arg_types;
-        return retval;
+int get_server(std::list<std::string> &servers, std::string &result) {
+    result.clear();
+    if (servers.empty()) {
+        return ERRNO_FUNC_NOT_FOUND;
     }
 
-    gen_sig(arg_types, arg_len);
-
-    hash.append(name, NAME_SIZE);
-    hash.append((char *) arg_types, arg_len);
-
-    delete[] arg_types;
-    return RETVAL_SUCCESS;
-}
-
-void get_server(std::list<std::string> &servers, std::string &result) {
     result = servers.front();
     servers.pop_front();
     servers.push_back(result);
+
+    return RETVAL_SUCCESS;
 }
 
 int function_lookup(std::string &hash, std::string &result) {
@@ -112,14 +91,14 @@ int function_lookup(std::string &hash, std::string &result) {
     it = registered_functions.find(hash);
 
     if (it != registered_functions.end()) {
-        get_server(it->second, result);
-        return RETVAL_SUCCESS;
+        return get_server(it->second, result);
     } else {
         return ERRNO_FUNC_NOT_FOUND;
     }
 }
 
 int register_function(std::string &hash, std::string &server) {
+    std::cout << "Looking for dups" << std::endl;
     std::map<std::string, std::list<std::string> >::iterator it;
     it = registered_functions.find(hash);
 
@@ -130,7 +109,7 @@ int register_function(std::string &hash, std::string &server) {
             return RETVAL_SUCCESS;
         }
 
-        it->second.push_back(hash);
+        it->second.push_back(server);
     } else {
         std::list<std::string> *v = new std::list<std::string>;
         if (v == NULL) {
@@ -144,16 +123,18 @@ int register_function(std::string &hash, std::string &server) {
 }
 
 int handle_register(int sd, int len, std::string &server_addr) {
-    std::cout << "Register" << std::endl;
-    int arg_len = len - NAME_SIZE;
+    std::cout << "Register:" << len << std::endl;
 
     // Generate a hash
     std::string hash;
-    get_hash(sd, hash, arg_len);
+    int retval = get_hash(sd, hash, len);
+    if (retval < 0) {
+        return retval;
+    }
 
     // Get server lock
     // Add function to server
-    int retval = register_function(hash, server_addr);
+    retval = register_function(hash, server_addr);
     // Release server lock
 
     return retval;
@@ -216,21 +197,23 @@ int handle_init(int sd, int len) {
 
 int handle_lookup(int sd, int len) {
     std::cout << "Handling lookup"<< std::endl;
-    int arg_len = len - NAME_SIZE;
 
     // Generate a hash
     std::string hash;
-    get_hash(sd, hash, arg_len);
+    int retval = get_hash(sd, hash, len);
+    if (retval < 0) {
+        send_header(sd, 0, retval);
+        return retval;
+    }
 
     // Lookup the function
-    std::string server;
     // Get server lock
-    int retval = function_lookup(hash, server);
+    std::string server;
+    retval = function_lookup(hash, server);
     // Release server lock
 
     // Respond with status
     if (retval != RETVAL_SUCCESS) {
-        len = sizeof(int);
         send_header(sd, 0, retval);
     } else {
         send_header(sd, server.length(), retval);

@@ -9,9 +9,7 @@
 #include <cassert>
 
 static TCPStream *server_connection = NULL;
-void rpcReset() {
-    close(server_connection->get_sd());
-}
+
 
 unsigned int get_arg_num(int *argTypes) {
     unsigned int i = 0;
@@ -20,6 +18,51 @@ unsigned int get_arg_num(int *argTypes) {
     }
     return i;
 }
+
+int get_msg_data(int sd, void *result, int data_len) {
+    char buffer[BUFFER_SIZE];
+    int len;
+    int bytes_read = 0;
+
+    while (bytes_read < data_len) {
+        // Read from the socket
+        len = read(sd, buffer, data_len);
+        if (len <= 0) {
+            return ERRNO_FAILED_READ;
+        }
+
+        // Copy the read data into the result buffer
+        memcpy(((char *) result) + bytes_read, buffer, len);
+
+        // Increment the bytes read
+        bytes_read += len;
+    }
+    return bytes_read;
+}
+
+void gen_sig(int *argTypes) {
+    int total_args = get_arg_num(argTypes);
+    for (int i = 0; i < total_args; i++) {
+        argTypes[i] &= ARG_TYPE_MASK;
+    }
+}
+
+int get_hash(std::string &hash, char *name, int *argTypes) {
+    hash.clear();
+
+    int arg_len = get_arg_num(argTypes);
+    gen_sig(argTypes);
+
+    hash.append(name);
+    hash.append((char *) argTypes, arg_len * sizeof(int));
+
+    return RETVAL_SUCCESS;
+}
+
+void rpcReset() {
+    close(server_connection->get_sd());
+}
+
 
 int connect_to_binder(TCPConnector *c, TCPStream **stream) {
     char *server_name = "127.0.0.1"; // getenv("BINDER_ADDRESS");
@@ -74,6 +117,24 @@ int send_int(TCPStream *stream, int data) {
     return stream->send(&data);
 }
 
+int send_hash(TCPStream *stream, int type, std::string &hash) {
+
+    int hash_len = hash.length();
+    std::cout << "Sending:" << hash_len << ":" << hash << std::endl;
+    if (stream->send(&hash_len) != sizeof(int)) {
+        return ERRNO_FAILED_SEND;
+    }
+    if (stream->send(&type) != sizeof(int)) {
+        return ERRNO_FAILED_SEND;
+    }
+
+    if (stream->send(hash.c_str(), hash_len) != hash_len) {
+        return ERRNO_FAILED_SEND;
+    }
+
+    return RETVAL_SUCCESS;
+}
+
 int send_data(TCPStream *stream, int type, bool sig_only, char *name, int *argTypes, void **args) {
     char sys_name[NAME_SIZE];
     copy_name(sys_name, name);
@@ -121,17 +182,18 @@ int rpcCall(char *name, int *argTypes, void **args) {
         return retval;
     }
 
+    // Generate the function hash
+    std::string hash;
+    get_hash(hash, name, argTypes);
+
     // Send lookup request
-    retval = send_data(stream, LOOKUP, true, name, argTypes, NULL);
-    if (retval != RETVAL_SUCCESS) {
-        return retval;
-    }
+    retval = send_hash(stream, LOOKUP, hash);
+
 
     // Get binder lookup response
     std::string msg;
     int msg_len = get_int(stream);
-    int type = 99;
-    type = get_int(stream);
+    int type = get_int(stream);
 
     // If return value is an error code
     if (type != RETVAL_SUCCESS) {
@@ -205,7 +267,12 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
         return ERRNO_FAILED_TO_CONNECT;
     }
 
-    int retval = send_data(server_connection, REGISTER, true, name, argTypes, NULL);
+    // Generate the function hash
+    std::string hash;
+    get_hash(hash, name, argTypes);
+
+    // Send the register request
+    int retval = send_hash(server_connection, REGISTER, hash);
     if (retval != RETVAL_SUCCESS) {
         return retval;
     }

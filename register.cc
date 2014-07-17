@@ -19,8 +19,8 @@
 int main() {
 
     int argTypes[3];
-    argTypes[0] = (int) 'a';
-    argTypes[1] = (int) 'b';
+    argTypes[0] = 1 << 31;
+    argTypes[1] = 1 << 30;
     argTypes[2] = 0;
 
     // void *args[1];
