@@ -2,13 +2,17 @@
 #include <string>
 #include "tcpconnector.h"
 #include "tcpstream.h"
+#include "tcpacceptor.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <rpc_errno.h>
 #include <rpc.h>
 #include <cassert>
+#include <map>
+#include <unistd.h>
 
 static TCPStream *server_connection = NULL;
+static std::map<std::string, skeleton> server_functions;
 
 
 unsigned int get_arg_num(int *argTypes) {
@@ -17,6 +21,56 @@ unsigned int get_arg_num(int *argTypes) {
         i++;
     }
     return i;
+}
+
+inline bool is_array(int argType) {
+    return argType & ARG_ARRAY_MASK;
+}
+
+unsigned int get_type_size(int argType) {
+    int type = argType & ARG_TYPE_MASK;
+    int num = is_array(argType) ? (argType & ARG_ARRAY_LEN_MASK) : 1;
+    switch(type) {
+            case ARG_CHAR:
+                return sizeof(char) * num;
+            case ARG_SHORT:
+                return sizeof(short) * num;
+            case ARG_INT:
+                return sizeof(int) * num;
+            case ARG_LONG:
+                return sizeof(long) * num;
+            case ARG_FLOAT:
+                return sizeof(float) * num;
+            case ARG_DOUBLE:
+                return sizeof(double) * num;
+            default:
+                std::cout << "Got invalid type" << std::endl;
+                return 0;
+        }
+}
+
+unsigned int get_arg_len(int *argTypes) {
+    unsigned int total;
+
+    for (unsigned int i = 0; i < get_arg_num(argTypes); i++) {
+        total += get_type_size(argTypes[i]);
+    }
+
+    return total;
+}
+
+void parse_args(int *argTypes, void **args, char *result) {
+    unsigned int offset = 0;
+    unsigned int size = 0;
+    for (unsigned int i = 0; i < get_arg_num(argTypes); i++) {
+        size = get_type_size(argTypes[i]);
+        if (is_array(argTypes[i])) {
+            memcpy(&(result[offset]), args[i], size);
+        } else {
+            memcpy(&(result[offset]), &(args[i]), size);
+        }
+        offset += size;
+    }
 }
 
 int get_msg_data(int sd, void *result, int data_len) {
@@ -43,7 +97,7 @@ int get_msg_data(int sd, void *result, int data_len) {
 void gen_sig(int *argTypes) {
     int total_args = get_arg_num(argTypes);
     for (int i = 0; i < total_args; i++) {
-        argTypes[i] &= ARG_TYPE_MASK;
+        argTypes[i] &= ARG_HASH_MASK;
     }
 }
 
@@ -51,11 +105,15 @@ int get_hash(std::string &hash, char *name, int *argTypes) {
     hash.clear();
 
     int arg_len = get_arg_num(argTypes);
-    gen_sig(argTypes);
+    int *temp_args = new int[arg_len + 1];
+    memcpy(temp_args, argTypes, arg_len + 1);
+
+    gen_sig(temp_args);
 
     hash.append(name);
-    hash.append((char *) argTypes, arg_len * sizeof(int));
+    hash.append((char *) temp_args, arg_len * sizeof(int));
 
+    delete[] temp_args;
     return RETVAL_SUCCESS;
 }
 
@@ -135,40 +193,43 @@ int send_hash(TCPStream *stream, int type, std::string &hash) {
     return RETVAL_SUCCESS;
 }
 
-int send_data(TCPStream *stream, int type, bool sig_only, char *name, int *argTypes, void **args) {
-    char sys_name[NAME_SIZE];
-    copy_name(sys_name, name);
+int send_data(TCPStream *stream, char *name, int *argTypes, char *args, int data_len) {
+    int name_len = strlen(name);
+    int arg_len = get_arg_num(argTypes);
+    int total_len = name_len + arg_len + data_len;
+    int type = EXECUTE;
 
-    // Send function lookup to binder
-    unsigned int arg_len = get_arg_num(argTypes);
+    stream->send(&total_len);
+    stream->send(&type);
 
-    if (!sig_only) {
-        // TODO calc param len
-    }
+    stream->send(&arg_len);
+    stream->send(argTypes, arg_len);
 
-    int msg_len = NAME_SIZE + arg_len * sizeof(int);
+    stream->send(&data_len);
+    stream->send(args, data_len);
 
-    std::cout << "msg_len:" << msg_len << std::endl;
-    if (stream->send(&msg_len) != sizeof(msg_len)) {
-        return ERRNO_FAILED_SEND;
-    }
-    std::cout << "type:" << type << std::endl;
-    if (stream->send(&type) != sizeof(type)) {
-        return ERRNO_FAILED_SEND;
-    }
-    std::cout << "name:" << NAME_SIZE << std::endl;
-    if (stream->send(sys_name, NAME_SIZE) != NAME_SIZE) {
-        return ERRNO_FAILED_SEND;
-    }
-    std::cout << "args:" << arg_len  << std::endl;
-    if (stream->send(argTypes, arg_len) != arg_len * sizeof(int)) {
-        return ERRNO_FAILED_SEND;
+    int msg_len = get_int(stream);
+    type = get_int(stream);
+
+    if (type == EXECUTE_SUCCESS) {
+        // TODO get result data
+        (void) msg_len;
+
+    } else if (type == EXECUTE_FAILURE) {
+        // TODO place result in correct place
+        get_int(stream);
     }
 
-    if (!sig_only) {
-        // TODO send params
-    }
+
+
     return RETVAL_SUCCESS;
+}
+
+void *execute(void *sd) {
+    int socket = *((int *)sd);
+
+    close(socket);
+    return NULL;
 }
 
 // Client functions
@@ -204,11 +265,22 @@ int rpcCall(char *name, int *argTypes, void **args) {
         std::cout << "Server: " << msg << std::endl;
     }
 
+
+
+    // Parse arguments and send
+    int data_len = get_arg_len(argTypes);
+
+    char *data = new char[data_len];
+
+    parse_args(argTypes, args, data);
+
     // Send execute request to server
+    send_data(stream, name, argTypes, data, data_len);
 
     // Get server response
 
     delete c;
+    delete[] data;
     return RETVAL_SUCCESS;
 }
 
@@ -271,6 +343,8 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
     std::string hash;
     get_hash(hash, name, argTypes);
 
+    server_functions.insert(std::make_pair(hash, f));
+
     // Send the register request
     int retval = send_hash(server_connection, REGISTER, hash);
     if (retval != RETVAL_SUCCESS) {
@@ -290,6 +364,25 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 }
 
 int rpcExecute() {
+    signal(SIGPIPE, SIG_IGN);
+    int retval;
+    TCPAcceptor *acceptor = new TCPAcceptor(12345);
+    if (acceptor->start() == 0) {
+        acceptor->display_name();
+        acceptor->display_port();
+
+        pthread_t handler;
+        int i = 0;
+        while(1) {
+            retval = acceptor->accept();
+            if (retval >= 0) {
+                pthread_create (&handler, NULL, execute, &retval);
+                i++;
+            }
+        }
+    }
+    std::cerr << "Failed to start server" << std::endl;
+
     return RETVAL_SUCCESS;
 }
 

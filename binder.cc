@@ -98,7 +98,6 @@ int function_lookup(std::string &hash, std::string &result) {
 }
 
 int register_function(std::string &hash, std::string &server) {
-    std::cout << "Looking for dups" << std::endl;
     std::map<std::string, std::list<std::string> >::iterator it;
     it = registered_functions.find(hash);
 
@@ -106,9 +105,11 @@ int register_function(std::string &hash, std::string &server) {
         std::list<std::string>::iterator lit;
         lit = std::find(it->second.begin(), it->second.end(), server);
         if (lit != it->second.end()) {
+            std::cout << "Found dup" << std::endl;
             return RETVAL_SUCCESS;
         }
 
+        std::cout << "Adding to list" << std::endl;
         it->second.push_back(server);
     } else {
         std::list<std::string> *v = new std::list<std::string>;
@@ -116,6 +117,7 @@ int register_function(std::string &hash, std::string &server) {
             return ERRNO_NO_SPACE;
         }
 
+        std::cout << "Completely new list" << std::endl;
         v->push_back(server);
         registered_functions.insert(std::pair<std::string, std::list<std::string> >(hash, *v));
     }
@@ -268,15 +270,14 @@ int main() {
             acceptor->display_name();
             acceptor->display_port();
 
-            pthread_t handler[100];
+            pthread_t handler;
             int i = 0;
             while(1) {
                 retval = acceptor->accept();
                 if (retval >= 0) {
-                    pthread_create (&(handler[i]), NULL, handle_request, &retval);
+                    pthread_create (&handler, NULL, handle_request, &retval);
                     i++;
                 }
-                pthread_join(handler[i-1], NULL);
             }
         }
         std::cerr << "Failed to start server" << std::endl;
