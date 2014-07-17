@@ -1,5 +1,5 @@
 #include <iostream>
-#include <vector>
+#include <list>
 #include <cstring>
 #include <unistd.h>
 #include "tcpacceptor.h"
@@ -7,10 +7,11 @@
 #include <rpc_errno.h>
 #include <pthread.h>
 #include <map>
+#include <algorithm>
 
 #define BUFFER_SIZE 256
 
-static map<std::string, std::vector<std::string> > registered_functions;
+static map<std::string, std::list<std::string> > registered_functions;
 
 
 int get_data(int sd, void *result, int data_len) {
@@ -100,12 +101,14 @@ int get_hash(int sd, std::string &hash, int arg_len) {
     return RETVAL_SUCCESS;
 }
 
-void get_server(std::vector<std::string> &servers, std::string &result) {
+void get_server(std::list<std::string> &servers, std::string &result) {
     result = servers.front();
+    servers.pop_front();
+    servers.push_back(result);
 }
 
 int function_lookup(std::string &hash, std::string &result) {
-    std::map<std::string, std::vector<std::string> >::iterator it;
+    std::map<std::string, std::list<std::string> >::iterator it;
     it = registered_functions.find(hash);
 
     if (it != registered_functions.end()) {
@@ -117,19 +120,25 @@ int function_lookup(std::string &hash, std::string &result) {
 }
 
 int register_function(std::string &hash, std::string &server) {
-    std::map<std::string, std::vector<std::string> >::iterator it;
+    std::map<std::string, std::list<std::string> >::iterator it;
     it = registered_functions.find(hash);
 
     if (it != registered_functions.end()) {
+        std::list<std::string>::iterator lit;
+        lit = std::find(it->second.begin(), it->second.end(), server);
+        if (lit != it->second.end()) {
+            return RETVAL_SUCCESS;
+        }
+
         it->second.push_back(hash);
     } else {
-        std::vector<std::string> *v = new std::vector<std::string>;
+        std::list<std::string> *v = new std::list<std::string>;
         if (v == NULL) {
             return ERRNO_NO_SPACE;
         }
 
         v->push_back(server);
-        registered_functions.insert(std::pair<std::string, std::vector<std::string> >(hash, *v));
+        registered_functions.insert(std::pair<std::string, std::list<std::string> >(hash, *v));
     }
     return RETVAL_SUCCESS;
 }
@@ -184,6 +193,22 @@ int handle_init(int sd, int len) {
 
     // Get server lock
     // Remove server functions
+    std::list<std::string>::iterator lit;
+    std::map<std::string, std::list<std::string> >::iterator it;
+    for (it = registered_functions.begin(); it != registered_functions.end(); ++it){
+        lit = std::find(it->second.begin(), it->second.end(), server_addr);
+        if (lit != it->second.end()) {
+            std::cout << "Unregistered:" << it->first << "@" << *lit << std::endl;
+            it->second.erase(lit);
+        }
+    }
+
+    for (it = registered_functions.begin(); it != registered_functions.end(); ++it){
+        for (lit = it->second.begin(); lit != it->second.end(); ++lit) {
+            std::cout << "Remains:" << it->first << "@" << *lit << std::endl;
+
+        }
+    }
     // Release server lock
 
     return RETVAL_SUCCESS;
@@ -217,7 +242,6 @@ int handle_lookup(int sd, int len) {
 
 
 void *handle_request(void *sd) {
-    try {
     int socket = *((int *)sd);
 
     // Get the length of the message

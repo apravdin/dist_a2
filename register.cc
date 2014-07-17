@@ -31,36 +31,7 @@ int main() {
     std::cout << "Init:" << retval << std::endl;
     retval = rpcRegister("f0", argTypes, *f0_Skel);
     retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
-    retval = rpcRegister("f0", argTypes, *f0_Skel);
+
     if (retval != RETVAL_SUCCESS) {
         std::cout << "Failed to register:" << retval << std::endl;
     } else {

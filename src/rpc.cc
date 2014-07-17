@@ -13,8 +13,8 @@ void rpcReset() {
     close(server_connection->get_sd());
 }
 
-int get_arg_num(int *argTypes) {
-    int i = 0;
+unsigned int get_arg_num(int *argTypes) {
+    unsigned int i = 0;
     while(argTypes[i] != 0) {
         i++;
     }
@@ -79,7 +79,7 @@ int send_data(TCPStream *stream, int type, bool sig_only, char *name, int *argTy
     copy_name(sys_name, name);
 
     // Send function lookup to binder
-    int arg_len = get_arg_num(argTypes);
+    unsigned int arg_len = get_arg_num(argTypes);
 
     if (!sig_only) {
         // TODO calc param len
