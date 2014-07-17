@@ -6,7 +6,7 @@ OBJ=$(wildcard src/*.o)
 
 BIN=$(patsubst %.cc,%.out, $(SRC))
 
-CFLAGS = -c -Wall -I include
+CFLAGS = -c -Wall -I include -Wno-write-strings
 LDFLAGS =
 
 .SUFFIXES:
