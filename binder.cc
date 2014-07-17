@@ -12,6 +12,7 @@
 #define BUFFER_SIZE 256
 
 static map<std::string, std::list<std::string> > registered_functions;
+static map<std::string, int> server_ports;
 
 
 int get_data(int sd, void *result, int data_len) {
@@ -124,7 +125,7 @@ int register_function(std::string &hash, std::string &server) {
     return RETVAL_SUCCESS;
 }
 
-int handle_register(int sd, int len, std::string &server_addr) {
+int handle_register(int sd, int len, std::string &server_addr, int port) {
     std::cout << "Register:" << len << std::endl;
 
     // Generate a hash
@@ -145,12 +146,20 @@ int handle_register(int sd, int len, std::string &server_addr) {
 int handle_init(int sd, int len) {
     std::cout << "Server Init" << std::endl;
 
+    int port;
+    len = read(sd, &port, sizeof(int));
+    if (len <= 0) {
+        send_header(sd, 0, len);
+    }
+
     // Get server addr
     std::string server_addr;
     get_client_addr(sd, server_addr);
 
     // Respond with status
     send_header(sd, 0, RETVAL_SUCCESS);
+
+    server_ports.insert(std::make_pair(server_addr, port));
 
     // Keep connection alive
     int msg_len;
@@ -166,7 +175,7 @@ int handle_init(int sd, int len) {
         }
         // Continuously register unless connection is closed
         if (type == REGISTER) {
-            int retval = handle_register(sd, msg_len, server_addr);
+            int retval = handle_register(sd, msg_len, server_addr, port);
             send_header(sd, 0, retval);
         }
     }
@@ -191,6 +200,12 @@ int handle_init(int sd, int len) {
             std::cout << "Remains:" << it->first << "@" << *lit << std::endl;
 
         }
+    }
+
+    std::map<std::string, int>::iterator pit;
+    pit = server_ports.find(server_addr);
+    if (pit != server_ports.end()) {
+        server_ports.erase(pit);
     }
     // Release server lock
 
@@ -220,6 +235,8 @@ int handle_lookup(int sd, int len) {
     } else {
         send_header(sd, server.length(), retval);
         retval = write(sd, server.c_str(), server.length());
+        int port = server_ports[server];
+        write(sd, &port, sizeof(int));
     }
 
     return RETVAL_SUCCESS;

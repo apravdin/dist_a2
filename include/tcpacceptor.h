@@ -23,6 +23,8 @@ class TCPAcceptor {
 
     void display_name();
     void display_port();
+    void get_server(std::string &server);
+    int get_port();
     int get_sd();
 };
 

@@ -13,6 +13,7 @@
 
 static TCPStream *server_connection = NULL;
 static std::map<std::string, skeleton> server_functions;
+static TCPAcceptor *server_acceptor = NULL;
 
 
 void send_msg_header(int sd, int len, int type) {
@@ -307,7 +308,6 @@ int rpcCall(char *name, int *argTypes, void **args) {
 
     // Get binder lookup response
     std::string server;
-    std::string port;
     int msg_len = get_int(stream);
     int type = get_int(stream);
 
@@ -320,20 +320,11 @@ int rpcCall(char *name, int *argTypes, void **args) {
         std::cout << "Server: " << server << std::endl;
     }
 
-    msg_len = get_int(stream);
-    type = get_int(stream);
-    if (type != RETVAL_SUCCESS) {
-        std::cout << "Server: Lookup failed:" << msg_len << " " << type << std::endl;
-        return ERRNO_FUNC_NOT_FOUND;
-    } else {
-        get_str(stream, port, msg_len);
-        std::cout << "Port: " << port << std::endl;
-    }
-
+    int port = get_int(stream);
 
     delete stream;
 
-    stream = c->connect(atoi(port.c_str()), server.c_str());
+    stream = c->connect(port, server.c_str());
 
     // Parse arguments and send
     int data_len = get_arg_len(argTypes);
@@ -385,15 +376,23 @@ int rpcInit() {
     TCPStream *stream;
 
     int retval = connect_to_binder(c, &stream);
+    server_connection = stream;
 
     if (retval != RETVAL_SUCCESS) {
         return ERRNO_FAILED_TO_CONNECT;
     }
 
-    server_connection = stream;
+    // Open socket to accept connections
+    signal(SIGPIPE, SIG_IGN);
+    server_acceptor = new TCPAcceptor(1337);
+    if (server_acceptor->start() != 0) {
+        return ERRNO_FAILED_TO_START_SERVER;
+    }
 
+    int port = server_acceptor->get_port();
     send_int(stream, 0);
     send_int(stream, INIT);
+    send_int(stream, port);
 
     retval = get_int(stream);
     if (retval != 0) {
@@ -437,24 +436,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 }
 
 int rpcExecute() {
-    signal(SIGPIPE, SIG_IGN);
-    int retval;
-    TCPAcceptor *acceptor = new TCPAcceptor(12345);
-    if (acceptor->start() == 0) {
-        acceptor->display_name();
-        acceptor->display_port();
 
-        pthread_t handler;
-        int i = 0;
-        while(1) {
-            retval = acceptor->accept();
-            if (retval >= 0) {
-                pthread_create (&handler, NULL, execute, &retval);
-                i++;
-            }
-        }
-    }
-    std::cerr << "Failed to start server" << std::endl;
 
     return RETVAL_SUCCESS;
 }

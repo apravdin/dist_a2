@@ -71,6 +71,18 @@ void TCPAcceptor::display_port() {
     std::cout << "SERVER_PORT " << this->m_port << std::endl;
 }
 
+void TCPAcceptor::get_server(std::string &server) {
+    char server_name[1024];
+    bzero(server_name, 1024);
+    gethostname(server_name, 1024);
+    server.clear();
+    server.append(server_name);
+}
+
+int TCPAcceptor::get_port() {
+    return this->m_port;
+}
+
 int TCPAcceptor::get_sd() {
     return this->m_lsd;
 }
