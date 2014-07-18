@@ -114,12 +114,10 @@ int register_function(std::string &hash, std::pair<std::string, int> &server) {
         std::list<std::pair<std::string, int> >::iterator lit;
         lit = std::find(it->second.begin(), it->second.end(), server);
         if (lit != it->second.end()) {
-            std::cout << "Found dup" << std::endl;
             pthread_mutex_unlock(&mutex_func);
             return RETVAL_SUCCESS;
         }
 
-        std::cout << "Adding to list" << std::endl;
         it->second.push_back(std::make_pair(server.first, server.second));
     } else {
         std::list<std::pair<std::string, int> > *v = new std::list<std::pair<std::string, int> >;
@@ -128,7 +126,6 @@ int register_function(std::string &hash, std::pair<std::string, int> &server) {
             return ERRNO_NO_SPACE;
         }
 
-        std::cout << "Completely new list" << std::endl;
         v->push_back(std::make_pair(server.first, server.second));
         registered_functions.insert(std::pair<std::string, std::list<std::pair<std::string, int> > >(hash, *v));
     }
@@ -145,7 +142,6 @@ void unregister_server(std::pair<std::string, int> &server) {
     for (it = registered_functions.begin(); it != registered_functions.end(); ++it){
         lit = std::find(it->second.begin(), it->second.end(), server);
         if (lit != it->second.end()) {
-            std::cout << "Unregistered:" << it->first << "@" << lit->first << std::endl;
             it->second.erase(lit);
         }
     }
@@ -157,7 +153,6 @@ void unregister_server(std::pair<std::string, int> &server) {
     std::list<std::pair<std::string, int> >::iterator pit;
     for (pit = server_ports.begin(); pit != server_ports.end(); ++pit) {
         if (server.first == pit->first && server.second == pit->second) {
-            std::cout << "Found server to unregister" << std::endl;
             server_ports.erase(pit);
             break;
         }
@@ -191,7 +186,6 @@ int handle_init(int sd, int len) {
     // Get server addr
     std::string server_addr;
     get_client_addr(sd, server_addr);
-    std::cout << "Registered server:" << server_addr << ":" << server_addr.length() << std::endl;
 
     // Respond with status
     send_header(sd, 0, RETVAL_SUCCESS);
@@ -220,7 +214,6 @@ int handle_init(int sd, int len) {
         }
     }
 
-    std::cout << "Closing connection to server:" << server_addr << std::endl;
 
 
     // Get server lock
@@ -251,7 +244,6 @@ int handle_lookup(int sd, int len) {
     if (retval != RETVAL_SUCCESS) {
         send_header(sd, 0, retval);
     } else {
-        std::cout << "Found server:" << server.first << ":" << server.second << std::endl;
         int port = server.second;
         send_header(sd, server.first.length(), retval);
         write(sd, server.first.c_str(), server.first.length());
@@ -302,23 +294,18 @@ void *handle_request(void *sd) {
 
     switch(type) {
         case INIT:
-            std::cout << "SERVER INIT:" << socket << std::endl;
             handle_init(socket, len);
             break;
         case LOOKUP:
-            std::cout << "CLIENT LOOKUP:" << socket << std::endl;
             handle_lookup(socket, len);
             break;
         case TERMINATE:
-            std::cout << "CLIENT TERMINATE:" << socket << std::endl;
             handle_terminate(socket, len);
             break;
         default:
-            std::cout << "Got invalid request:" << type << std::endl;
             send_header(socket, 0, BINDER_INVALID_COMMAND);
             break;
     }
-    std::cout << "Closing sd:" << socket << std::endl;
     close(socket);
     return NULL;
 }
@@ -348,7 +335,7 @@ int main() {
         std::cerr << "Failed to start server" << std::endl;
 
     } catch (int e) {
-        std::cout << "Exception Caught:" << e << std::endl;
+        std::cerr << "Exception Caught:" << e << std::endl;
     }
 
     pthread_mutex_destroy(&mutex_func);

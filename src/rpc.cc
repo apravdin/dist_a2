@@ -43,25 +43,18 @@ unsigned int get_type_size(int argType) {
     int num = is_array(argType) ? (argType & ARG_ARRAY_LEN_MASK) : 1;
     switch(type) {
             case ARG_CHAR:
-                std::cout << "Got Char " << sizeof(char) * num << std::endl;
                 return sizeof(char) * num;
             case ARG_SHORT:
-                std::cout << "Got short " << sizeof(short) * num << std::endl;
                 return sizeof(short) * num;
             case ARG_INT:
-                std::cout << "Got int " << sizeof(int) * num << std::endl;
                 return sizeof(int) * num;
             case ARG_LONG:
-                std::cout << "Got long " << sizeof(long) * num << std::endl;
                 return sizeof(long) * num;
             case ARG_FLOAT:
-                std::cout << "Got float " << sizeof(float) * num << std::endl;
                 return sizeof(float) * num;
             case ARG_DOUBLE:
-                std::cout << "Got double " << sizeof(double) * num << std::endl;
                 return sizeof(double) * num;
             default:
-                std::cout << "Got invalid type: 0x" << std::hex << type << std::dec << std::endl;
                 return 0;
         }
 }
@@ -90,11 +83,9 @@ void copy_results(char *data, int *argTypes, void **args) {
     for(unsigned int i = 0; i < get_arg_num(argTypes); i++) {
         size = get_type_size(argTypes[i]);
         if (is_not_output(argTypes[i])) {
-            std::cout << "Skip" << std::endl;
             offset += size;
             continue;
         }
-        std::cout << "Copy" << std::endl;
         memcpy(args[i], &(data[offset]), size);
         offset += size;
     }
@@ -110,7 +101,6 @@ void parse_args(int *argTypes, void **args, char *result) {
             continue;
         }
 
-        std::cout << "Copying " << size << " from 0x" << args[i] << std::endl;
         memcpy(&(result[offset]), args[i], size);
         offset += size;
     }
@@ -221,14 +211,12 @@ int send_data(TCPStream *stream, char *name, int *argTypes, char *args, int data
     if (stream->send(&total_len) != sizeof(int)) {
         return ERRNO_FAILED_SEND;
     }
-    std::cout << "Sent total:" << total_len << std::endl;
     if (stream->send(&type) != sizeof(int)) {
         return ERRNO_FAILED_SEND;
     }
     if (stream->send(&name_len) != sizeof(int)) {
         return ERRNO_FAILED_SEND;
     }
-    std::cout << "Sent name:" << name_len << std::endl;
     if (stream->send(name, name_len) != name_len) {
         return ERRNO_FAILED_SEND;
     }
@@ -237,10 +225,8 @@ int send_data(TCPStream *stream, char *name, int *argTypes, char *args, int data
     }
 
     for (int i = 0; i < arg_len; i++) {
-        std::cout << "Arg:" << std::hex << argTypes[i] << std::dec << std::endl;
     }
 
-    std::cout << "Sent arg:" << arg_len << std::endl;
     if (stream->send(argTypes, arg_len) != (int) (arg_len * sizeof(int))) {
         return ERRNO_FAILED_SEND;
     }
@@ -248,7 +234,6 @@ int send_data(TCPStream *stream, char *name, int *argTypes, char *args, int data
         return ERRNO_FAILED_SEND;
     }
 
-    std::cout << "Sent total data:" << data_len << std::endl;
     if (stream->send(args, data_len) != data_len) {
         return ERRNO_FAILED_SEND;
     }
@@ -269,10 +254,8 @@ void *execute(void *sd) {
     get_msg_data(socket, &type, sizeof(int));
 
     if (type == TERMINATE) {
-        std::cout << "TERMINATE" << std::endl;
         exit(0);
     }else if (type != EXECUTE) {
-        std::cout << "INVALID EXECUTE COMMAND" << std::endl;
         return NULL;
     }
 
@@ -280,22 +263,18 @@ void *execute(void *sd) {
     get_msg_data(socket, &name_len, sizeof(int));
     char *name = new char[name_len];
     get_msg_data(socket, name, name_len);
-    std::cout << "Received name:" << name_len << std::endl;
 
     get_msg_data(socket, &arg_len, sizeof(int));
     int *argTypes = new int[arg_len];
     get_msg_data(socket, argTypes, arg_len * sizeof(int));
 
     for (int i = 0; i < arg_len; i++) {
-        std::cout << "Arg:" << std::hex << argTypes[i] << std::dec << std::endl;
     }
-    std::cout << "Received arg:" << arg_len << std::endl;
 
 
     get_msg_data(socket, &data_len, sizeof(int));
     char *data = new char[data_len];
     get_msg_data(socket, data, data_len);
-    std::cout << "Received args:" << data_len << std::endl;
 
     void **args = new void*[arg_len - 1];
     map_list(data, argTypes, args);
@@ -306,11 +285,9 @@ void *execute(void *sd) {
     map<std::string, skeleton>::iterator it;
     it = server_functions.find(hash);
     if (it == server_functions.end()) {
-        std::cout << "sending invalid func header" << std::endl;
         send_msg_header(socket, sizeof(int), EXECUTE_FAILURE);
         int errno = ERRNO_FUNC_NOT_FOUND;
         write(socket, &errno, sizeof(int));
-        std::cout << "Invalid function" << std::endl;
         delete[] name;
         delete[] argTypes;
         delete[] data;
@@ -318,9 +295,7 @@ void *execute(void *sd) {
         return NULL;
     }
 
-    std::cout << "good function" << std::endl;
     skeleton f = it->second;
-    std::cout << "func addr: 0x" << (void *) f << std::endl;
 
 
     int retval = f(argTypes, args);
@@ -336,12 +311,9 @@ void *execute(void *sd) {
 
     parse_args(argTypes, args, data);
 
-    std::cout << "executed function" << std::endl;
 
     send_msg_header(socket, data_len, EXECUTE_SUCCESS);
-    std::cout << "sent result header" << std::endl;
     write(socket, data, data_len);
-    std::cout << "sent results" << std::endl;
 
     close(socket);
     delete[] name;
@@ -357,7 +329,6 @@ int rpcCall(char *name, int *argTypes, void **args) {
     TCPConnector *c = new TCPConnector();
     TCPStream *stream;
 
-    std::cout << args[0];
 
     int retval = connect_to_binder(c, &stream);
     if (retval != RETVAL_SUCCESS) {
@@ -381,7 +352,6 @@ int rpcCall(char *name, int *argTypes, void **args) {
 
     // If return value is an error code
     if (type != RETVAL_SUCCESS) {
-        std::cout << "Server: Lookup failed:" << msg_len << " " << type << std::endl;
         delete c;
         delete stream;
         return ERRNO_FUNC_NOT_FOUND;
@@ -390,12 +360,9 @@ int rpcCall(char *name, int *argTypes, void **args) {
         char server_buf[100];
         read(stream->get_sd(), server_buf, msg_len);
         server.append(server_buf, msg_len);
-        std::cout << "Addr len:" << msg_len << std::endl;
-        std::cout << "Server: " << server << std::endl;
     }
 
     int port = get_int(stream);
-    std::cout << "Port: " << port << std::endl;
 
     // delete stream;
 
@@ -405,45 +372,36 @@ int rpcCall(char *name, int *argTypes, void **args) {
         delete stream;
         return ERRNO_FAILED_TO_CONNECT;
     }
-    std::cout << "Connected to server" << std::endl;
     // Parse arguments and send
     int data_len = get_arg_len(argTypes);
 
-    std::cout << "Got arg len:" << data_len << std::endl;
     char *data = new char[data_len];
 
     parse_args(argTypes, args, data);
 
-    std::cout << "Parsed args:" << std::endl;
 
     // Send execute request to server
     retval = send_data(stream, name, argTypes, data, data_len);
     if (retval != RETVAL_SUCCESS) {
-        std::cout << "Failed send" << std::endl;
         delete c;
         delete[] data;
         delete stream;
         return retval;
     }
-    std::cout << "Sent data:" << std::endl;
 
     // Get server response
     msg_len = get_int(stream);
     type = get_int(stream);
-    std::cout << "Got responce:" << msg_len << std::endl;
 
     if (type == EXECUTE_FAILURE) {
-        std::cout << "Exec failed" << std::endl;
         retval = get_int(stream);
     } else {
-        std::cout << "Exec success" << std::endl;
         stream->receive(data, msg_len);
         copy_results(data, argTypes, args);
         retval = RETVAL_SUCCESS;
     }
 
 
-    std::cout << "Got final val" << std::endl;
 
 
     delete c;
@@ -495,7 +453,6 @@ int rpcInit() {
     signal(SIGPIPE, SIG_IGN);
     server_acceptor = new TCPAcceptor(1337);
     if (server_acceptor->start() != 0) {
-        std::cout << "Failed to start server" << std::endl;
         delete c;
         delete server_acceptor;
         return ERRNO_FAILED_TO_START_SERVER;
@@ -527,7 +484,6 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
         return ERRNO_FAILED_TO_CONNECT;
     }
 
-    std::cout << "func addr: 0x" << (void *) f << std::endl;
 
     // Generate the function hash
     std::string hash;
