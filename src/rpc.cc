@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <map>
 #include <unistd.h>
+#include <csignal>
 #include <rpc.h>
 #include "my_rpc.h"
 #include "rpc_errno.h"

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "tcpacceptor.h"
 #include "tcpconnector.h"
+#include <csignal>
 #include <rpc.h>
 #include <rpc_errno.h>
 #include <pthread.h>
