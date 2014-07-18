@@ -20,7 +20,7 @@ make_src:
 	$(CXX) $(CFLAGS) $< -o $@
 
 %.out: %.o
-	$(CXX) -o $@ $< $(LDFLAGS) -lrpc $(OBJ)
+	$(CXX) -o $@ $< $(LDFLAGS) -lrpc -lpthread $(OBJ)
 
 clean:
 	make -C src clean
