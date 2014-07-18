@@ -1,6 +1,25 @@
 =========================
+Written by
+=========================
+Anton Pravdin - 20378263 - apravdin
+Serghei Filippov - 20390471 - sfilippo
+
+Detailed report can be found in `Report.pdf` in the root directory
+
+=========================
+Requirements
+=========================
+
+pthread - both for the RPC lib and binder executable
+
+=========================
 Compiling
 =========================
+
+NOTE:   The makefile will compile any .cc files found in the root directory
+        and link with all the .o files found in the src directory
+        and link with librpc
+        The respective executable will have the extension .out
 
 > cd ROOT_DIR
 > make
@@ -24,7 +43,7 @@ This will start the binder and display the `BINDER_ADDRESS` and `BINDER_PORT`.
 
 > ./server.out
 
-This will start up the example server provided with this assignement.
+This will start up the example server provided with this assignment.
 
 > ./client1.out
 

@@ -255,7 +255,7 @@ void *execute(void *sd) {
 
     if (type == TERMINATE) {
         exit(0);
-    }else if (type != EXECUTE) {
+    } else if (type != EXECUTE) {
         return NULL;
     }
 
