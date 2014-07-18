@@ -120,7 +120,7 @@ int register_function(std::string &hash, std::pair<std::string, int> &server) {
         }
 
         std::cout << "Adding to list" << std::endl;
-        it->second.push_back(server);
+        it->second.push_back(std::make_pair(server.first, server.second));
     } else {
         std::list<std::pair<std::string, int> > *v = new std::list<std::pair<std::string, int> >;
         if (v == NULL) {
@@ -129,7 +129,7 @@ int register_function(std::string &hash, std::pair<std::string, int> &server) {
         }
 
         std::cout << "Completely new list" << std::endl;
-        v->push_back(server);
+        v->push_back(std::make_pair(server.first, server.second));
         registered_functions.insert(std::pair<std::string, std::list<std::pair<std::string, int> > >(hash, *v));
     }
 
