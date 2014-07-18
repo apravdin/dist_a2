@@ -63,7 +63,7 @@ void get_client_addr(int sd, std::string &result) {
     socklen_t len = sizeof(address);
     bzero(&address, sizeof(address));
 
-    getsockname(sd, (struct sockaddr*)&address, &len);
+    getpeername(sd, (struct sockaddr*)&address, &len);
 
     result.append(inet_ntoa(address.sin_addr));
 }

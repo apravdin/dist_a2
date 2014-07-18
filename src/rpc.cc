@@ -386,7 +386,11 @@ int rpcCall(char *name, int *argTypes, void **args) {
         delete stream;
         return ERRNO_FUNC_NOT_FOUND;
     } else {
-        get_str(stream, server, msg_len);
+        server.clear();
+        char server_buf[100];
+        read(stream->get_sd(), server_buf, msg_len);
+        server.append(server_buf, msg_len);
+        std::cout << "Addr len:" << msg_len << std::endl;
         std::cout << "Server: " << server << std::endl;
     }
 
