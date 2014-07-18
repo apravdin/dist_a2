@@ -29,34 +29,44 @@ unsigned int get_arg_num(int *argTypes) {
     return i;
 }
 
+bool is_not_output(int argType) {
+    return (argType & (1 << ARG_OUTPUT)) == 0;
+}
+
 inline bool is_array(int argType) {
-    return argType & ARG_ARRAY_MASK;
+    return (argType & ARG_ARRAY_LEN_MASK) > 0;
 }
 
 unsigned int get_type_size(int argType) {
-    int type = argType & ARG_TYPE_MASK;
+    int type = (argType & ARG_TYPE_MASK) >> 16;
     int num = is_array(argType) ? (argType & ARG_ARRAY_LEN_MASK) : 1;
     switch(type) {
             case ARG_CHAR:
+                std::cout << "Got Char " << sizeof(char) * num << std::endl;
                 return sizeof(char) * num;
             case ARG_SHORT:
+                std::cout << "Got short " << sizeof(short) * num << std::endl;
                 return sizeof(short) * num;
             case ARG_INT:
+                std::cout << "Got int " << sizeof(int) * num << std::endl;
                 return sizeof(int) * num;
             case ARG_LONG:
+                std::cout << "Got long " << sizeof(long) * num << std::endl;
                 return sizeof(long) * num;
             case ARG_FLOAT:
+                std::cout << "Got float " << sizeof(float) * num << std::endl;
                 return sizeof(float) * num;
             case ARG_DOUBLE:
+                std::cout << "Got double " << sizeof(double) * num << std::endl;
                 return sizeof(double) * num;
             default:
-                std::cout << "Got invalid type" << std::endl;
+                std::cout << "Got invalid type: 0x" << std::hex << type << std::dec << std::endl;
                 return 0;
         }
 }
 
 unsigned int get_arg_len(int *argTypes) {
-    unsigned int total;
+    unsigned int total = 0;
 
     for (unsigned int i = 0; i < get_arg_num(argTypes); i++) {
         total += get_type_size(argTypes[i]);
@@ -65,39 +75,48 @@ unsigned int get_arg_len(int *argTypes) {
     return total;
 }
 
-void parse_args(int *argTypes, void **args, char *result) {
+void map_list(char *data, int *argTypes, void **result) {
+    unsigned int offset = 0;
+    for(unsigned int i = 0; i < get_arg_num(argTypes); i++) {
+        result[i] = &(data[offset]);
+        offset += get_type_size(argTypes[i]);
+    }
+}
+
+void copy_results(char *data, int *argTypes, void **args) {
     unsigned int offset = 0;
     unsigned int size = 0;
+    for(unsigned int i = 0; i < get_arg_num(argTypes); i++) {
+        size = get_type_size(argTypes[i]);
+        if (is_not_output(argTypes[i])) {
+            std::cout << "Skip" << std::endl;
+            offset += size;
+            continue;
+        }
+        std::cout << "Copy" << std::endl;
+        memcpy(args[i], &(data[offset]), size);
+        offset += size;
+    }
+}
+
+void parse_args(int *argTypes, void **args, char *result) {
+    unsigned int size = 0;
+    unsigned int offset = 0;
+
     for (unsigned int i = 0; i < get_arg_num(argTypes); i++) {
         size = get_type_size(argTypes[i]);
-        if (is_array(argTypes[i])) {
-            memcpy(&(result[offset]), args[i], size);
-        } else {
-            memcpy(&(result[offset]), &(args[i]), size);
+        if (size == 0) {
+            continue;
         }
+
+        std::cout << "Copying " << size << " from 0x" << args[i] << std::endl;
+        memcpy(&(result[offset]), args[i], size);
         offset += size;
     }
 }
 
 int get_msg_data(int sd, void *result, int data_len) {
-    char buffer[BUFFER_SIZE];
-    int len;
-    int bytes_read = 0;
-
-    while (bytes_read < data_len) {
-        // Read from the socket
-        len = read(sd, buffer, data_len);
-        if (len <= 0) {
-            return ERRNO_FAILED_READ;
-        }
-
-        // Copy the read data into the result buffer
-        memcpy(((char *) result) + bytes_read, buffer, len);
-
-        // Increment the bytes read
-        bytes_read += len;
-    }
-    return bytes_read;
+    return read(sd, result, data_len);
 }
 
 void gen_sig(int *argTypes) {
@@ -112,7 +131,7 @@ int get_hash(std::string &hash, char *name, int *argTypes) {
 
     int arg_len = get_arg_num(argTypes);
     int *temp_args = new int[arg_len + 1];
-    memcpy(temp_args, argTypes, arg_len + 1);
+    memcpy(temp_args, argTypes, (arg_len + 1) * sizeof(int));
 
     gen_sig(temp_args);
 
@@ -129,8 +148,8 @@ void rpcReset() {
 
 
 int connect_to_binder(TCPConnector *c, TCPStream **stream) {
-    char *server_name = "127.0.0.1"; // getenv("BINDER_ADDRESS");
-    char *port = "61111"; // getenv("BINDER_PORT");
+    char *server_name = getenv("BINDER_ADDRESS");
+    char *port = getenv("BINDER_PORT");
     if (server_name == NULL || port == NULL) {
         std::cerr << "Failed to find BINDER_ADDRESS or BINDER_PORT" << std::endl;
         return ERRNO_ENV_VAR_NOT_SET;
@@ -204,31 +223,40 @@ int send_data(TCPStream *stream, char *name, int *argTypes, char *args, int data
     int total_len = name_len + arg_len + data_len;
     int type = EXECUTE;
 
-    stream->send(&total_len);
-    stream->send(&type);
-
-    stream->send(&name_len);
-    stream->send(name, name_len);
-
-    stream->send(&arg_len);
-    stream->send(argTypes, arg_len);
-
-    stream->send(&data_len);
-    stream->send(args, data_len);
-
-    int msg_len = get_int(stream);
-    type = get_int(stream);
-
-    if (type == EXECUTE_SUCCESS) {
-        // TODO get result data
-        (void) msg_len;
-
-    } else if (type == EXECUTE_FAILURE) {
-        // TODO place result in correct place
-        get_int(stream);
+    if (stream->send(&total_len) != sizeof(int)) {
+        return ERRNO_FAILED_SEND;
+    }
+    std::cout << "Sent total:" << total_len << std::endl;
+    if (stream->send(&type) != sizeof(int)) {
+        return ERRNO_FAILED_SEND;
+    }
+    if (stream->send(&name_len) != sizeof(int)) {
+        return ERRNO_FAILED_SEND;
+    }
+    std::cout << "Sent name:" << name_len << std::endl;
+    if (stream->send(name, name_len) != name_len) {
+        return ERRNO_FAILED_SEND;
+    }
+    if (stream->send(&arg_len) != sizeof(int)) {
+        return ERRNO_FAILED_SEND;
     }
 
+    for (int i = 0; i < arg_len; i++) {
+        std::cout << "Arg:" << std::hex << argTypes[i] << std::dec << std::endl;
+    }
 
+    std::cout << "Sent arg:" << arg_len << std::endl;
+    if (stream->send(argTypes, arg_len) != arg_len * sizeof(int)) {
+        return ERRNO_FAILED_SEND;
+    }
+    if (stream->send(&data_len) != sizeof(int)) {
+        return ERRNO_FAILED_SEND;
+    }
+
+    std::cout << "Sent total data:" << data_len << std::endl;
+    if (stream->send(args, data_len) != data_len) {
+        return ERRNO_FAILED_SEND;
+    }
 
     return RETVAL_SUCCESS;
 }
@@ -253,15 +281,26 @@ void *execute(void *sd) {
 
     get_msg_data(socket, &name_len, sizeof(int));
     char *name = new char[name_len];
-    get_msg_data(socket, &name, name_len);
+    get_msg_data(socket, name, name_len);
+    std::cout << "Received name:" << name_len << std::endl;
 
     get_msg_data(socket, &arg_len, sizeof(int));
     int *argTypes = new int[arg_len];
-    get_msg_data(socket, &argTypes, arg_len * sizeof(int));
+    get_msg_data(socket, argTypes, arg_len * sizeof(int));
+
+    for (int i = 0; i < arg_len; i++) {
+        std::cout << "Arg:" << std::hex << argTypes[i] << std::dec << std::endl;
+    }
+    std::cout << "Received arg:" << arg_len << std::endl;
+
 
     get_msg_data(socket, &data_len, sizeof(int));
-    void **args = (void **) new char[data_len];
-    get_msg_data(socket, &args, data_len);
+    char *data = new char[data_len];
+    get_msg_data(socket, data, data_len);
+    std::cout << "Received args:" << data_len << std::endl;
+
+    void **args = new void*[arg_len - 1];
+    map_list(data, argTypes, args);
 
     std::string hash;
     get_hash(hash, name, argTypes);
@@ -269,20 +308,48 @@ void *execute(void *sd) {
     map<std::string, skeleton>::iterator it;
     it = server_functions.find(hash);
     if (it == server_functions.end()) {
+        std::cout << "sending invalid func header" << std::endl;
         send_msg_header(socket, sizeof(int), EXECUTE_FAILURE);
         int errno = ERRNO_FUNC_NOT_FOUND;
         write(socket, &errno, sizeof(int));
+        std::cout << "Invalid function" << std::endl;
+        delete[] name;
+        delete[] argTypes;
+        delete[] data;
+        delete[] args;
         return NULL;
     }
 
+    std::cout << "good function" << std::endl;
     skeleton f = it->second;
+    std::cout << "func addr: 0x" << (void *) f << std::endl;
 
-    f(argTypes, args);
+
+    int retval = f(argTypes, args);
+    if (retval != 0) {
+        send_msg_header(socket, sizeof(int), EXECUTE_FAILURE);
+        write(socket, &retval, sizeof(int));
+        delete[] name;
+        delete[] argTypes;
+        delete[] data;
+        delete[] args;
+        return NULL;
+    }
+
+    parse_args(argTypes, args, data);
+
+    std::cout << "executed function" << std::endl;
 
     send_msg_header(socket, data_len, EXECUTE_SUCCESS);
-    write(socket, args, data_len);
+    std::cout << "sent result header" << std::endl;
+    write(socket, data, data_len);
+    std::cout << "sent results" << std::endl;
 
     close(socket);
+    delete[] name;
+    delete[] argTypes;
+    delete[] data;
+    delete[] args;
     return NULL;
 }
 
@@ -292,10 +359,14 @@ int rpcCall(char *name, int *argTypes, void **args) {
     TCPConnector *c = new TCPConnector();
     TCPStream *stream;
 
+    std::cout << args[0];
+
     int retval = connect_to_binder(c, &stream);
     if (retval != RETVAL_SUCCESS) {
+        delete c;
         return ERRNO_FAILED_TO_CONNECT;
     }
+
 
     // Generate the function hash
     std::string hash;
@@ -313,6 +384,8 @@ int rpcCall(char *name, int *argTypes, void **args) {
     // If return value is an error code
     if (type != RETVAL_SUCCESS) {
         std::cout << "Server: Lookup failed:" << msg_len << " " << type << std::endl;
+        delete c;
+        delete stream;
         return ERRNO_FUNC_NOT_FOUND;
     } else {
         get_str(stream, server, msg_len);
@@ -320,34 +393,61 @@ int rpcCall(char *name, int *argTypes, void **args) {
     }
 
     int port = get_int(stream);
+    std::cout << "Port: " << port << std::endl;
 
-    delete stream;
+    // delete stream;
 
-    *stream = c->connect(port, server.c_str());
-    if (*stream == NULL) {
+    stream = c->connect(port, server.c_str());
+    if (stream == NULL) {
+        delete c;
+        delete stream;
         return ERRNO_FAILED_TO_CONNECT;
     }
-
+    std::cout << "Connected to server" << std::endl;
     // Parse arguments and send
     int data_len = get_arg_len(argTypes);
 
+    std::cout << "Got arg len:" << data_len << std::endl;
     char *data = new char[data_len];
 
     parse_args(argTypes, args, data);
 
+    std::cout << "Parsed args:" << std::endl;
+
     // Send execute request to server
-    send_data(stream, name, argTypes, data, data_len);
+    retval = send_data(stream, name, argTypes, data, data_len);
+    if (retval != RETVAL_SUCCESS) {
+        std::cout << "Failed send" << std::endl;
+        delete c;
+        delete[] data;
+        delete stream;
+        return retval;
+    }
+    std::cout << "Sent data:" << std::endl;
 
     // Get server response
     msg_len = get_int(stream);
     type = get_int(stream);
+    std::cout << "Got responce:" << msg_len << std::endl;
 
-    stream->receive((char *) args, msg_len);
+    if (type == EXECUTE_FAILURE) {
+        std::cout << "Exec failed" << std::endl;
+        retval = get_int(stream);
+    } else {
+        std::cout << "Exec success" << std::endl;
+        stream->receive(data, msg_len);
+        copy_results(data, argTypes, args);
+        retval = RETVAL_SUCCESS;
+    }
+
+
+    std::cout << "Got final val" << std::endl;
 
 
     delete c;
     delete[] data;
-    return RETVAL_SUCCESS;
+    delete stream;
+    return retval;
 }
 
 int rpcCacheCall(char* name, int* argTypes, void** args) {
@@ -362,12 +462,16 @@ int rpcTerminate() {
     int retval = connect_to_binder(c, &stream);
 
     if (retval != RETVAL_SUCCESS) {
+        delete c;
         return retval;
     }
 
     send_int(stream, 0);
     send_int(stream, TERMINATE);
 
+
+    delete c;
+    delete stream;
     return RETVAL_SUCCESS;
 }
 
@@ -378,16 +482,20 @@ int rpcInit() {
     TCPStream *stream;
 
     int retval = connect_to_binder(c, &stream);
-    server_connection = stream;
-
     if (retval != RETVAL_SUCCESS) {
+        delete c;
         return ERRNO_FAILED_TO_CONNECT;
     }
+
+    server_connection = stream;
 
     // Open socket to accept connections
     signal(SIGPIPE, SIG_IGN);
     server_acceptor = new TCPAcceptor(1337);
     if (server_acceptor->start() != 0) {
+        std::cout << "Failed to start server" << std::endl;
+        delete c;
+        delete server_acceptor;
         return ERRNO_FAILED_TO_START_SERVER;
     }
 
@@ -398,10 +506,14 @@ int rpcInit() {
 
     retval = get_int(stream);
     if (retval != 0) {
+        delete c;
+        delete server_acceptor;
         return ERRNO_INIT_FAILED;
     }
     retval = get_int(stream);
     if (retval != RETVAL_SUCCESS) {
+        delete c;
+        delete server_acceptor;
         return ERRNO_INIT_FAILED;
     }
 
@@ -412,6 +524,8 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
     if (server_connection == NULL) {
         return ERRNO_FAILED_TO_CONNECT;
     }
+
+    std::cout << "func addr: 0x" << (void *) f << std::endl;
 
     // Generate the function hash
     std::string hash;
@@ -438,7 +552,19 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 }
 
 int rpcExecute() {
+    if (server_acceptor == NULL) {
+        return ERRNO_FAILED_TO_START_SERVER;
+    }
 
+    pthread_t handler;
+    int i = 0;
+    while(1) {
+        int retval = server_acceptor->accept();
+        if (retval >= 0) {
+            pthread_create (&handler, NULL, execute, &retval);
+            i++;
+        }
+    }
 
     return RETVAL_SUCCESS;
 }

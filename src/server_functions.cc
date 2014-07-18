@@ -3,16 +3,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <iostream>
 
 /* return: OUT; a, b: IN */
 int f0(int a, int b) {
-
+  std::cout << "Executing f0" << std::endl;
   return a + b;
 }
 
 
 /* returns: OUT; a, b, c, d: IN */
 long f1(char a, short b, int c, long d) {
+  std::cout << "Executing f1" << std::endl;
 
   return a + b * c - d;
 }
@@ -23,6 +25,8 @@ long f1(char a, short b, int c, long d) {
    return: OUT string; a, b: IN */
 
 char* f2(float a, double b) {
+  std::cout << "Executing f2" << std::endl;
+  std::cout << "Got vars - a:" << a << " b:" << b << std::endl;
 
   float ai;
   double bi;
@@ -46,6 +50,7 @@ char* f2(float a, double b) {
  */
 
 void f3(long a[]) {
+  std::cout << "Executing f3" << std::endl;
 
   int len = a[0];
   int i, j, k;
@@ -53,9 +58,9 @@ void f3(long a[]) {
   for (i = 0; i < len; i++) {
     for (j = len - 1; j > i; j--) {
       if (a[j] > a[j - 1]) {
-	k = a[j];
-	a[j] = a[j - 1];
-	a[j - 1] = k;
+  k = a[j];
+  a[j] = a[j - 1];
+  a[j - 1] = k;
       }
     }
   }
@@ -67,6 +72,7 @@ void f3(long a[]) {
  */
 
 void f4(char a[]) {
+  std::cout << "Executing f4" << std::endl;
 
   /* print file a to a printer */
 }

@@ -126,8 +126,6 @@ int register_function(std::string &hash, std::string &server) {
 }
 
 int handle_register(int sd, int len, std::string &server_addr, int port) {
-    std::cout << "Register:" << len << std::endl;
-
     // Generate a hash
     std::string hash;
     int retval = get_hash(sd, hash, len);
@@ -144,8 +142,6 @@ int handle_register(int sd, int len, std::string &server_addr, int port) {
 }
 
 int handle_init(int sd, int len) {
-    std::cout << "Server Init" << std::endl;
-
     int port;
     len = read(sd, &port, sizeof(int));
     if (len <= 0) {
@@ -213,8 +209,6 @@ int handle_init(int sd, int len) {
 }
 
 int handle_lookup(int sd, int len) {
-    std::cout << "Handling lookup"<< std::endl;
-
     // Generate a hash
     std::string hash;
     int retval = get_hash(sd, hash, len);
@@ -262,9 +256,11 @@ void *handle_request(void *sd) {
 
     switch(type) {
         case INIT:
+            std::cout << "SERVER INIT:" << socket << std::endl;
             handle_init(socket, len);
             break;
         case LOOKUP:
+            std::cout << "CLIENT LOOKUP:" << socket << std::endl;
             handle_lookup(socket, len);
             break;
         default:

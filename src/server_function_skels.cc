@@ -1,9 +1,12 @@
 #include "server_functions.h"
 #include <stdio.h>
 #include <string.h>
+#include <iostream>
 
 int f0_Skel(int *argTypes, void **args) {
+  std::cout << "f0 Skel" << std::endl;
 
+  std::cout << "other:" << *(int *)args[0] << " a:" << *(int *)args[1] << " b:" << *(int *)args[2] << std::endl;
   *(int *)args[0] = f0(*(int *)args[1], *(int *)args[2]);
   return 0;
 }

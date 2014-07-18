@@ -1,4 +1,5 @@
 #include <rpc.h>
+#include <iostream>
 #include <server_function_skels.h>
 
 int main(int argc, char *argv[]) {

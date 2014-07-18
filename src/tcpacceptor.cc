@@ -31,7 +31,7 @@ int TCPAcceptor::start() {
     bzero(&address, sizeof(address));
     address.sin_family = PF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.sin_port = htons(61111);
+    address.sin_port = htons(INADDR_ANY);
 
     int result = bind(this->m_lsd, (struct sockaddr*)&address, sizeof(address));
 
@@ -55,7 +55,7 @@ int TCPAcceptor::accept() {
     int sd = ::accept(this->m_lsd, (struct sockaddr*)NULL, NULL);
 
     if (sd < 0) {
-        std::cerr << "Failed to accept" << std::endl;
+        // std::cerr << "Failed to accept" << std::endl;
     }
 
     return sd;
