@@ -92,12 +92,14 @@ int function_lookup(std::string &hash, std::string &result) {
     it = registered_functions.find(hash);
 
     if (it != registered_functions.end()) {
-        return get_server(it->second, result);
+        int retval = get_server(it->second, result);
+        pthread_mutex_unlock(&mutex_func);
+        return retval;
     } else {
+        pthread_mutex_unlock(&mutex_func);
         return ERRNO_FUNC_NOT_FOUND;
     }
 
-    pthread_mutex_unlock(&mutex_func);
 }
 
 int register_function(std::string &hash, std::string &server) {
