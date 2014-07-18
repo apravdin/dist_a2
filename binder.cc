@@ -145,6 +145,7 @@ int handle_init(int sd, int len) {
     // Get server addr
     std::string server_addr;
     get_client_addr(sd, server_addr);
+    std::cout << "Registered server:" << server_addr << ":" << server_addr.length() << std::endl;
 
     // Respond with status
     send_header(sd, 0, RETVAL_SUCCESS);
@@ -221,6 +222,7 @@ int handle_lookup(int sd, int len) {
     if (retval != RETVAL_SUCCESS) {
         send_header(sd, 0, retval);
     } else {
+        std::cout << "Found server:" << server << ":" << server.length() << std::endl;
         send_header(sd, server.length(), retval);
         retval = write(sd, server.c_str(), server.length());
         int port = server_ports[server];
