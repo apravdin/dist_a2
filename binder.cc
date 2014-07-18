@@ -14,6 +14,10 @@
 
 #define BUFFER_SIZE 256
 
+static pthread_mutex_t mutex_func;
+static pthread_mutex_t mutex_serv;
+
+
 static map<std::string, std::list<std::string> > registered_functions;
 static map<std::string, int> server_ports;
 
@@ -82,6 +86,8 @@ int get_server(std::list<std::string> &servers, std::string &result) {
 }
 
 int function_lookup(std::string &hash, std::string &result) {
+    pthread_mutex_lock(&mutex_func);
+
     std::map<std::string, std::list<std::string> >::iterator it;
     it = registered_functions.find(hash);
 
@@ -90,9 +96,13 @@ int function_lookup(std::string &hash, std::string &result) {
     } else {
         return ERRNO_FUNC_NOT_FOUND;
     }
+
+    pthread_mutex_unlock(&mutex_func);
 }
 
 int register_function(std::string &hash, std::string &server) {
+    pthread_mutex_lock(&mutex_func);
+
     std::map<std::string, std::list<std::string> >::iterator it;
     it = registered_functions.find(hash);
 
@@ -101,6 +111,7 @@ int register_function(std::string &hash, std::string &server) {
         lit = std::find(it->second.begin(), it->second.end(), server);
         if (lit != it->second.end()) {
             std::cout << "Found dup" << std::endl;
+            pthread_mutex_unlock(&mutex_func);
             return RETVAL_SUCCESS;
         }
 
@@ -109,6 +120,7 @@ int register_function(std::string &hash, std::string &server) {
     } else {
         std::list<std::string> *v = new std::list<std::string>;
         if (v == NULL) {
+            pthread_mutex_unlock(&mutex_func);
             return ERRNO_NO_SPACE;
         }
 
@@ -116,7 +128,35 @@ int register_function(std::string &hash, std::string &server) {
         v->push_back(server);
         registered_functions.insert(std::pair<std::string, std::list<std::string> >(hash, *v));
     }
+
+    pthread_mutex_unlock(&mutex_func);
     return RETVAL_SUCCESS;
+}
+
+void unregister_server(std::string &server_addr) {
+    pthread_mutex_lock(&mutex_func);
+
+    std::list<std::string>::iterator lit;
+    std::map<std::string, std::list<std::string> >::iterator it;
+    for (it = registered_functions.begin(); it != registered_functions.end(); ++it){
+        lit = std::find(it->second.begin(), it->second.end(), server_addr);
+        if (lit != it->second.end()) {
+            std::cout << "Unregistered:" << it->first << "@" << *lit << std::endl;
+            it->second.erase(lit);
+        }
+    }
+
+    pthread_mutex_unlock(&mutex_func);
+
+    pthread_mutex_lock(&mutex_serv);
+
+    std::map<std::string, int>::iterator pit;
+    pit = server_ports.find(server_addr);
+    if (pit != server_ports.end()) {
+        server_ports.erase(pit);
+    }
+
+    pthread_mutex_unlock(&mutex_serv);
 }
 
 int handle_register(int sd, int len, std::string &server_addr, int port) {
@@ -150,7 +190,10 @@ int handle_init(int sd, int len) {
     // Respond with status
     send_header(sd, 0, RETVAL_SUCCESS);
 
+
+    pthread_mutex_lock(&mutex_serv);
     server_ports.insert(std::make_pair(server_addr, port));
+    pthread_mutex_unlock(&mutex_serv);
 
     // Keep connection alive
     int msg_len;
@@ -176,28 +219,7 @@ int handle_init(int sd, int len) {
 
     // Get server lock
     // Remove server functions
-    std::list<std::string>::iterator lit;
-    std::map<std::string, std::list<std::string> >::iterator it;
-    for (it = registered_functions.begin(); it != registered_functions.end(); ++it){
-        lit = std::find(it->second.begin(), it->second.end(), server_addr);
-        if (lit != it->second.end()) {
-            std::cout << "Unregistered:" << it->first << "@" << *lit << std::endl;
-            it->second.erase(lit);
-        }
-    }
-
-    for (it = registered_functions.begin(); it != registered_functions.end(); ++it){
-        for (lit = it->second.begin(); lit != it->second.end(); ++lit) {
-            std::cout << "Remains:" << it->first << "@" << *lit << std::endl;
-
-        }
-    }
-
-    std::map<std::string, int>::iterator pit;
-    pit = server_ports.find(server_addr);
-    if (pit != server_ports.end()) {
-        server_ports.erase(pit);
-    }
+    unregister_server(server_addr);
     // Release server lock
 
     return RETVAL_SUCCESS;
@@ -225,7 +247,11 @@ int handle_lookup(int sd, int len) {
         std::cout << "Found server:" << server << ":" << server.length() << std::endl;
         send_header(sd, server.length(), retval);
         retval = write(sd, server.c_str(), server.length());
+
+        pthread_mutex_lock(&mutex_serv);
         int port = server_ports[server];
+        pthread_mutex_unlock(&mutex_serv);
+
         write(sd, &port, sizeof(int));
     }
 
@@ -239,11 +265,16 @@ int handle_terminate(int sd, int len) {
     int cmd = TERMINATE;
 
     std::map<std::string, int>::iterator pit;
+    pthread_mutex_lock(&mutex_serv);
     for (pit = server_ports.begin(); pit != server_ports.end(); ++pit) {
         stream = c->connect(pit->second, pit->first.c_str());
         stream->send(&len);
         stream->send(&cmd);
     }
+    pthread_mutex_unlock(&mutex_serv);
+
+    pthread_mutex_destroy(&mutex_func);
+    pthread_mutex_destroy(&mutex_serv);
 
     exit(0);
 }
@@ -294,6 +325,8 @@ int main() {
     signal(SIGPIPE, SIG_IGN);
     int retval;
     TCPAcceptor *acceptor = new TCPAcceptor(12345);
+    pthread_mutex_init(&mutex_func, NULL);
+    pthread_mutex_init(&mutex_serv, NULL);
     try {
         if (acceptor->start() == 0) {
             acceptor->display_name();
@@ -315,5 +348,7 @@ int main() {
         std::cout << "Exception Caught:" << e << std::endl;
     }
 
+    pthread_mutex_destroy(&mutex_func);
+    pthread_mutex_destroy(&mutex_serv);
     return 0;
 }
