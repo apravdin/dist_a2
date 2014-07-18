@@ -18,8 +18,10 @@ static pthread_mutex_t mutex_func;
 static pthread_mutex_t mutex_serv;
 
 
-static map<std::string, std::list<std::string> > registered_functions;
-static map<std::string, int> server_ports;
+static map<std::string, std::list<std::pair<std::string, int> > > registered_functions;
+
+// TODO change to list
+static list<std::pair<std::string, int> > server_ports;
 
 
 int get_data(int sd, void *result, int data_len) {
@@ -72,11 +74,11 @@ void get_client_addr(int sd, std::string &result) {
     result.append(inet_ntoa(address.sin_addr));
 }
 
-int get_server(std::list<std::string> &servers, std::string &result) {
-    result.clear();
+int get_server(std::list<std::pair<std::string, int> > &servers, std::pair<std::string, int> &result ) {
     if (servers.empty()) {
         return ERRNO_FUNC_NOT_FOUND;
     }
+
 
     result = servers.front();
     servers.pop_front();
@@ -85,10 +87,10 @@ int get_server(std::list<std::string> &servers, std::string &result) {
     return RETVAL_SUCCESS;
 }
 
-int function_lookup(std::string &hash, std::string &result) {
+int function_lookup(std::string &hash, std::pair<std::string, int> &result) {
     pthread_mutex_lock(&mutex_func);
 
-    std::map<std::string, std::list<std::string> >::iterator it;
+    std::map<std::string, std::list<std::pair<std::string, int> > >::iterator it;
     it = registered_functions.find(hash);
 
     if (it != registered_functions.end()) {
@@ -102,14 +104,14 @@ int function_lookup(std::string &hash, std::string &result) {
 
 }
 
-int register_function(std::string &hash, std::string &server) {
+int register_function(std::string &hash, std::pair<std::string, int> &server) {
     pthread_mutex_lock(&mutex_func);
 
-    std::map<std::string, std::list<std::string> >::iterator it;
+    std::map<std::string, std::list<std::pair<std::string, int> > >::iterator it;
     it = registered_functions.find(hash);
 
     if (it != registered_functions.end()) {
-        std::list<std::string>::iterator lit;
+        std::list<std::pair<std::string, int> >::iterator lit;
         lit = std::find(it->second.begin(), it->second.end(), server);
         if (lit != it->second.end()) {
             std::cout << "Found dup" << std::endl;
@@ -120,7 +122,7 @@ int register_function(std::string &hash, std::string &server) {
         std::cout << "Adding to list" << std::endl;
         it->second.push_back(server);
     } else {
-        std::list<std::string> *v = new std::list<std::string>;
+        std::list<std::pair<std::string, int> > *v = new std::list<std::pair<std::string, int> >;
         if (v == NULL) {
             pthread_mutex_unlock(&mutex_func);
             return ERRNO_NO_SPACE;
@@ -128,22 +130,22 @@ int register_function(std::string &hash, std::string &server) {
 
         std::cout << "Completely new list" << std::endl;
         v->push_back(server);
-        registered_functions.insert(std::pair<std::string, std::list<std::string> >(hash, *v));
+        registered_functions.insert(std::pair<std::string, std::list<std::pair<std::string, int> > >(hash, *v));
     }
 
     pthread_mutex_unlock(&mutex_func);
     return RETVAL_SUCCESS;
 }
 
-void unregister_server(std::string &server_addr) {
+void unregister_server(std::pair<std::string, int> &server) {
     pthread_mutex_lock(&mutex_func);
 
-    std::list<std::string>::iterator lit;
-    std::map<std::string, std::list<std::string> >::iterator it;
+    std::list<std::pair<std::string, int> >::iterator lit;
+    std::map<std::string, std::list<std::pair<std::string, int> > >::iterator it;
     for (it = registered_functions.begin(); it != registered_functions.end(); ++it){
-        lit = std::find(it->second.begin(), it->second.end(), server_addr);
+        lit = std::find(it->second.begin(), it->second.end(), server);
         if (lit != it->second.end()) {
-            std::cout << "Unregistered:" << it->first << "@" << *lit << std::endl;
+            std::cout << "Unregistered:" << it->first << "@" << lit->first << std::endl;
             it->second.erase(lit);
         }
     }
@@ -152,10 +154,13 @@ void unregister_server(std::string &server_addr) {
 
     pthread_mutex_lock(&mutex_serv);
 
-    std::map<std::string, int>::iterator pit;
-    pit = server_ports.find(server_addr);
-    if (pit != server_ports.end()) {
-        server_ports.erase(pit);
+    std::list<std::pair<std::string, int> >::iterator pit;
+    for (pit = server_ports.begin(); pit != server_ports.end(); ++pit) {
+        if (server.first == pit->first && server.second == pit->second) {
+            std::cout << "Found server to unregister" << std::endl;
+            server_ports.erase(pit);
+            break;
+        }
     }
 
     pthread_mutex_unlock(&mutex_serv);
@@ -169,10 +174,9 @@ int handle_register(int sd, int len, std::string &server_addr, int port) {
         return retval;
     }
 
-    // Get server lock
+    std::pair<std::string, int> server = std::make_pair(server_addr, port);
     // Add function to server
-    retval = register_function(hash, server_addr);
-    // Release server lock
+    retval = register_function(hash, server);
 
     return retval;
 }
@@ -194,7 +198,7 @@ int handle_init(int sd, int len) {
 
 
     pthread_mutex_lock(&mutex_serv);
-    server_ports.insert(std::make_pair(server_addr, port));
+    server_ports.push_back(std::make_pair(server_addr, port));
     pthread_mutex_unlock(&mutex_serv);
 
     // Keep connection alive
@@ -221,7 +225,8 @@ int handle_init(int sd, int len) {
 
     // Get server lock
     // Remove server functions
-    unregister_server(server_addr);
+    std::pair<std::string, int> server = std::make_pair(server_addr, port);
+    unregister_server(server);
     // Release server lock
 
     return RETVAL_SUCCESS;
@@ -238,7 +243,7 @@ int handle_lookup(int sd, int len) {
 
     // Lookup the function
     // Get server lock
-    std::string server;
+    std::pair<std::string, int>  server;
     retval = function_lookup(hash, server);
     // Release server lock
 
@@ -246,14 +251,10 @@ int handle_lookup(int sd, int len) {
     if (retval != RETVAL_SUCCESS) {
         send_header(sd, 0, retval);
     } else {
-        std::cout << "Found server:" << server << ":" << server.length() << std::endl;
-        send_header(sd, server.length(), retval);
-        retval = write(sd, server.c_str(), server.length());
-
-        pthread_mutex_lock(&mutex_serv);
-        int port = server_ports[server];
-        pthread_mutex_unlock(&mutex_serv);
-
+        std::cout << "Found server:" << server.first << ":" << server.second << std::endl;
+        int port = server.second;
+        send_header(sd, server.first.length(), retval);
+        write(sd, server.first.c_str(), server.first.length());
         write(sd, &port, sizeof(int));
     }
 
@@ -266,7 +267,7 @@ int handle_terminate(int sd, int len) {
 
     int cmd = TERMINATE;
 
-    std::map<std::string, int>::iterator pit;
+    std::list<std::pair<std::string, int> >::iterator pit;
     pthread_mutex_lock(&mutex_serv);
     for (pit = server_ports.begin(); pit != server_ports.end(); ++pit) {
         stream = c->connect(pit->second, pit->first.c_str());
