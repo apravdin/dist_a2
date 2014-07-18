@@ -1,26 +1,11 @@
 =========================
-Program stucture
-=========================
-
-ROOT/stringClient.cc
-ROOT/stringServer.cc
-
-ROOT/src/tcpstream.cc
-ROOT/src/tcpconnector.cc
-ROOT/src/tcpacceptor.cc
-
-ROOT/include/HEADER_FILES
-ROOT/Makefile
-ROOT/src/Makefile
-
-=========================
 Compiling
 =========================
 
 > cd ROOT_DIR
 > make
 
-This will generate `./stringServer` and `./stringClient`
+This will generate `./binder.out` and `src/librpc`
 
 =========================
 Cleaning
@@ -33,10 +18,15 @@ Cleaning
 Running
 =========================
 
-> ./stringServer
+> ./binder.out
 
-This will start a tcp server on a random port and will display the servers hostname and port number.
+This will start the binder and display the `BINDER_ADDRESS` and `BINDER_PORT`.
 
-> ./stringClient
+> ./server.out
 
-This will read the `SERVER_ADDRESS` and `SERVER_PORT` environment variables and attempt to connect to the server
+This will start up the example server provided with this assignement.
+
+> ./client1.out
+
+Same as server except the client.
+

@@ -285,7 +285,7 @@ void *execute(void *sd) {
     map<std::string, skeleton>::iterator it;
     it = server_functions.find(hash);
     if (it == server_functions.end()) {
-        send_msg_header(socket, sizeof(int), EXECUTE_FAILURE);
+        send_msg_header(socket, sizeof(int), ERRNO_EXECUTE_FAILED);
         int errno = ERRNO_FUNC_NOT_FOUND;
         write(socket, &errno, sizeof(int));
         delete[] name;
@@ -300,7 +300,7 @@ void *execute(void *sd) {
 
     int retval = f(argTypes, args);
     if (retval != 0) {
-        send_msg_header(socket, sizeof(int), EXECUTE_FAILURE);
+        send_msg_header(socket, sizeof(int), ERRNO_EXECUTE_FAILED);
         write(socket, &retval, sizeof(int));
         delete[] name;
         delete[] argTypes;
@@ -393,7 +393,7 @@ int rpcCall(char *name, int *argTypes, void **args) {
     msg_len = get_int(stream);
     type = get_int(stream);
 
-    if (type == EXECUTE_FAILURE) {
+    if (type == ERRNO_EXECUTE_FAILED) {
         retval = get_int(stream);
     } else {
         stream->receive(data, msg_len);

@@ -13,9 +13,10 @@
 
 
 // RPC errors
-#define ERRNO_REGISTER_FAILED           -10
-#define ERRNO_INIT_FAILED               -11
-#define ERRNO_FAILED_TO_START_SERVER    -12
+#define ERRNO_INIT_FAILED               -10
+#define ERRNO_FAILED_TO_START_SERVER    -11
+#define ERRNO_REGISTER_FAILED           -12
+#define ERRNO_EXECUTE_FAILED            -13
 
 // Binder errors
 #define BINDER_INVALID_COMMAND -1

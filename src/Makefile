@@ -13,7 +13,7 @@ all: $(OBJ) librpc
 	$(COMPILER) $(CFLAGS) -Wall $< -o $@
 
 librpc: rpc.o
-	$(ARCHIVER) rcs librpc.a rpc.o
+	$(ARCHIVER) rcs ../librpc.a rpc.o
 
 clean:
 	-rm -f *.o *.a

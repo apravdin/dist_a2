@@ -7,7 +7,7 @@ OBJ=$(filter-out src/rpc.o, $(wildcard src/*.o))
 BIN=$(patsubst %.cc,%.out, $(SRC))
 
 CFLAGS = -c -Wall -I include -Wno-write-strings
-LDFLAGS = -L src
+LDFLAGS = -L.
 
 .SUFFIXES:
 
