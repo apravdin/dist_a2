@@ -10,6 +10,7 @@
 #include <cassert>
 #include <map>
 #include <unistd.h>
+#include "my_rpc.h"
 
 static TCPStream *server_connection = NULL;
 static std::map<std::string, skeleton> server_functions;
@@ -33,7 +34,7 @@ bool is_not_output(int argType) {
     return (argType & (1 << ARG_OUTPUT)) == 0;
 }
 
-inline bool is_array(int argType) {
+bool is_array(int argType) {
     return (argType & ARG_ARRAY_LEN_MASK) > 0;
 }
 
@@ -164,12 +165,6 @@ int connect_to_binder(TCPConnector *c, TCPStream **stream) {
     return RETVAL_SUCCESS;
 }
 
-void copy_name(char *sys_name, char *name) {
-    memset(sys_name, 0, NAME_SIZE);
-    int name_len = strlen(name);
-    memcpy(sys_name, name, std::min(name_len + 1, NAME_SIZE));
-}
-
 int get_int(TCPStream *stream) {
     int msg;
     read(stream->get_sd(), &msg, sizeof(msg));
@@ -246,7 +241,7 @@ int send_data(TCPStream *stream, char *name, int *argTypes, char *args, int data
     }
 
     std::cout << "Sent arg:" << arg_len << std::endl;
-    if (stream->send(argTypes, arg_len) != arg_len * sizeof(int)) {
+    if (stream->send(argTypes, arg_len) != (int) (arg_len * sizeof(int))) {
         return ERRNO_FAILED_SEND;
     }
     if (stream->send(&data_len) != sizeof(int)) {
@@ -273,7 +268,10 @@ void *execute(void *sd) {
     get_msg_data(socket, &msg_len, sizeof(int));
     get_msg_data(socket, &type, sizeof(int));
 
-    if (type != EXECUTE) {
+    if (type == TERMINATE) {
+        std::cout << "TERMINATE" << std::endl;
+        exit(0);
+    }else if (type != EXECUTE) {
         std::cout << "INVALID EXECUTE COMMAND" << std::endl;
         return NULL;
     }

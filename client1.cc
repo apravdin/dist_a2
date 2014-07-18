@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <iostream>
 
 #include "rpc.h"
 
@@ -91,7 +90,6 @@ int main() {
 
   /* prepare the arguemtns for f4 */
   char *a4 = "non_exist_file_to_be_printed";
-  std::cout << "BASE_ADDR:" << (void *) a4 << std::endl;
   int count4 = 1;
   int argTypes4[count4 + 1];
   void **args4;
@@ -113,7 +111,6 @@ int main() {
     printf("Error: %d\n", s0);
   }
 
-  std::cout << "TESTING:" << (void *)args4[0] << std::endl;
 
   int s1 = rpcCall("f1", argTypes1, args1);
   /* test the return of f1 */
@@ -125,7 +122,6 @@ int main() {
     printf("Error: %d\n", s1);
   }
 
-  std::cout << "TESTING:" << (void *)args4[0] << std::endl;
 
   int s2 = rpcCall("f2", argTypes2, args2);
   /* test the return of f2 */
@@ -137,7 +133,6 @@ int main() {
     printf("Error: %d\n", s2);
   }
 
-  std::cout << "TESTING:" << (void *)args4[0] << std::endl;
 
   int s3 = rpcCall("f3", argTypes3, args3);
   /* test the return of f3 */
@@ -157,7 +152,6 @@ int main() {
     printf("Error: %d\n", s3);
   }
 
-  std::cout << "TESTING:" << (void *)args4[0] << std::endl;
   int s4 = rpcCall("f4", argTypes4, args4);
   /* test the return of f4 */
   printf("\ncalling f4 to print an non existed file on the server");
@@ -168,7 +162,6 @@ int main() {
   printf("\ndo you want to terminate? y/n: ");
   if (getchar() == 'y')
     rpcTerminate();
-  std::cout << "TESTING:" << (void *)args4[0] << std::endl;
 
   /* end of client.c */
   return 0;

@@ -3,11 +3,13 @@
 #include <cstring>
 #include <unistd.h>
 #include "tcpacceptor.h"
+#include "tcpconnector.h"
 #include <rpc.h>
 #include <rpc_errno.h>
 #include <pthread.h>
 #include <map>
 #include <algorithm>
+#include <my_rpc.h>
 
 #define BUFFER_SIZE 256
 
@@ -20,7 +22,6 @@ int get_data(int sd, void *result, int data_len) {
     int len;
     int bytes_read = 0;
 
-    // std::cout << "Start read:"<< data_len << std::endl;
     while (bytes_read < data_len) {
         // Read from the socket
         len = read(sd, buffer, data_len);
@@ -31,17 +32,9 @@ int get_data(int sd, void *result, int data_len) {
         // Copy the read data into the result buffer
         memcpy(((char *) result) + bytes_read, buffer, len);
 
-        // Null terminate for debug purposes
-        // buffer[len] = 0;
-        // for (int i = 0; i < len; i++) {
-        //     std::cout << (int) buffer[i] << ",";
-        // }
-        // std::cout << std::endl;
-
         // Increment the bytes read
         bytes_read += len;
     }
-    // std::cout << "End read:"<< bytes_read <<  std::endl;
     return bytes_read;
 }
 
@@ -236,6 +229,22 @@ int handle_lookup(int sd, int len) {
     return RETVAL_SUCCESS;
 }
 
+int handle_terminate(int sd, int len) {
+    TCPConnector *c = new TCPConnector();
+    TCPStream *stream;
+
+    int cmd = TERMINATE;
+
+    std::map<std::string, int>::iterator pit;
+    for (pit = server_ports.begin(); pit != server_ports.end(); ++pit) {
+        stream = c->connect(pit->second, pit->first.c_str());
+        stream->send(&len);
+        stream->send(&cmd);
+    }
+
+    exit(0);
+}
+
 
 void *handle_request(void *sd) {
     int socket = *((int *)sd);
@@ -262,6 +271,10 @@ void *handle_request(void *sd) {
         case LOOKUP:
             std::cout << "CLIENT LOOKUP:" << socket << std::endl;
             handle_lookup(socket, len);
+            break;
+        case TERMINATE:
+            std::cout << "CLIENT TERMINATE:" << socket << std::endl;
+            handle_terminate(socket, len);
             break;
         default:
             std::cout << "Got invalid request:" << type << std::endl;
