@@ -20,7 +20,6 @@ extern "C" {
 
 typedef int (*skeleton)(int *, void **);
 
-extern void rpcReset();
 extern int rpcInit();
 extern int rpcCall(char* name, int* argTypes, void** args);
 extern int rpcCacheCall(char* name, int* argTypes, void** args);

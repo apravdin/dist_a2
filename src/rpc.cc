@@ -1,16 +1,15 @@
 #include <iostream>
 #include <string>
+#include <stdlib.h>
+#include <unistd.h>
+#include <map>
+#include <unistd.h>
+#include <rpc.h>
+#include "my_rpc.h"
+#include "rpc_errno.h"
 #include "tcpconnector.h"
 #include "tcpstream.h"
 #include "tcpacceptor.h"
-#include <stdlib.h>
-#include <unistd.h>
-#include <rpc_errno.h>
-#include <rpc.h>
-#include <cassert>
-#include <map>
-#include <unistd.h>
-#include "my_rpc.h"
 
 static TCPStream *server_connection = NULL;
 static std::map<std::string, skeleton> server_functions;

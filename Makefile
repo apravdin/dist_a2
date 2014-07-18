@@ -2,12 +2,12 @@ CXX = g++
 
 SRC = $(wildcard *.cc)
 
-OBJ=$(wildcard src/*.o)
+OBJ=$(filter-out src/rpc.o, $(wildcard src/*.o))
 
 BIN=$(patsubst %.cc,%.out, $(SRC))
 
 CFLAGS = -c -Wall -I include -Wno-write-strings
-LDFLAGS =
+LDFLAGS = -L src
 
 .SUFFIXES:
 
@@ -20,7 +20,7 @@ make_src:
 	$(CXX) $(CFLAGS) $< -o $@
 
 %.out: %.o
-	$(CXX) -o $@ $(LDFLAGS) $< $(OBJ)
+	$(CXX) -o $@ $< $(LDFLAGS) -lrpc $(OBJ)
 
 clean:
 	make -C src clean
